@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>罠師の城</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Noto+Serif+JP:wght@300;400;600&display=swap');
+:root{
+  --bg:#0a0608;--panel:#12090e;--border:#3a1a2a;
+  --gold:#c9a84c;--gold2:#e8cc7a;
+  --red:#c0392b;--red2:#e74c3c;
+  --teal:#1a6b5a;
+  --text:#d4b896;--dim:#7a6050;--heroine:#e8a0b0;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Noto Serif JP',serif;
+  min-height:100vh;
+  background-image:
+    radial-gradient(ellipse at 20% 50%,rgba(108,52,131,.07) 0%,transparent 60%),
+    radial-gradient(ellipse at 80% 20%,rgba(192,57,43,.06) 0%,transparent 50%);
+  touch-action:manipulation;
+}
+
+/* TITLE */
+#title-screen{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:1.5em 1em;
+  background-image:radial-gradient(ellipse at center,rgba(108,52,131,.15) 0%,transparent 70%);
+}
+.title-castle{font-size:4em;margin-bottom:.15em;filter:drop-shadow(0 0 20px rgba(201,168,76,.4));animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.title-main{font-family:'Cinzel Decorative',cursive;font-size:clamp(1.3em,6vw,2.2em);color:var(--gold);
+  text-shadow:0 0 20px rgba(201,168,76,.6);letter-spacing:.08em;margin-bottom:.15em;text-align:center;}
+.title-sub{font-size:.8em;color:var(--dim);letter-spacing:.25em;margin-bottom:1.5em;}
+.title-desc{max-width:380px;width:100%;text-align:center;font-size:.78em;line-height:2;
+  color:#a08878;margin-bottom:1.8em;padding:1em 1.2em;border:1px solid var(--border);background:rgba(18,9,14,.8);}
+.title-desc .tip{color:var(--gold2);}
+.btn-start{font-family:'Cinzel Decorative',cursive;font-size:.95em;padding:.8em 2.2em;
+  background:linear-gradient(135deg,#1a0d12,#2a1020);border:1px solid var(--gold);color:var(--gold);
+  cursor:pointer;letter-spacing:.12em;touch-action:manipulation;
+  box-shadow:0 0 15px rgba(201,168,76,.2);min-height:48px;}
+
+/* GAME */
+#game{display:none;padding:.5em .5em 1em;}
+
+.game-header{text-align:center;padding:.4em 0;border-bottom:1px solid var(--border);margin-bottom:.5em;}
+.game-title{font-family:'Cinzel Decorative',cursive;color:var(--gold);font-size:.95em;letter-spacing:.12em;}
+.stage-info{font-size:.65em;color:var(--dim);margin-top:.15em;letter-spacing:.18em;}
+
+/* STATUS BAR */
+.status-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:.35em;margin-bottom:.5em;}
+.stat-box{background:var(--panel);border:1px solid var(--border);padding:.4em .5em;text-align:center;}
+.stat-label{font-size:.52em;color:var(--dim);letter-spacing:.15em;margin-bottom:.15em;}
+.stat-value{font-size:.95em;color:var(--gold);font-weight:600;}
+.hp-bar{height:4px;background:#1a0808;border:1px solid #3a1a1a;margin-top:.25em;overflow:hidden;}
+.hp-fill{height:100%;background:linear-gradient(90deg,#8b0000,#e74c3c);transition:width .4s ease;}
+.pt-bar{height:4px;background:#0a1a0a;border:1px solid #1a3a1a;margin-top:.25em;overflow:hidden;}
+.pt-fill{height:100%;background:linear-gradient(90deg,#1a6b3a,#4ecb71);transition:width .4s ease;}
+.timer-value{color:#e8cc7a;}
+.timer-value.urgent{color:var(--red2);animation:pulse .5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* DUNGEON — fixed aspect ratio so it always renders */
+.dungeon-view{
+  background:var(--panel);border:1px solid var(--border);
+  position:relative;overflow:hidden;
+  width:100%;
+  /* aspect-ratio keeps height proportional to width */
+  aspect-ratio:4/3;
+  margin-bottom:.5em;
+}
+.dungeon-canvas{
+  position:absolute;inset:0;
+  display:grid;gap:1px;padding:1px;
+}
+.heroine-overlay{position:absolute;inset:0;z-index:20;pointer-events:none;overflow:hidden;}
+
+/* CELL */
+.cell{
+  background:#0e0810;border:1px solid #1a0d15;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(.65em,2.8vw,1.1em);
+  transition:background .12s;position:relative;user-select:none;
+  -webkit-user-select:none;touch-action:manipulation;
+}
+.cell:active{background:#1a0d18;border-color:var(--border);}
+.cell.placed{background:#160a18;border-color:#3a1a3a;}
+.cell.wall{background:#060406;border-color:#0e060e;cursor:default;}
+.cell.goal-cell{background:#0a160c;border-color:#1a3a1e;}
+.cell.forbidden{cursor:not-allowed;background:#150808;border-color:#3a1010;font-size:.65em;color:#5a2020;}
+.cell.box-placed{background:#1a1005;border-color:#4a3010;}
+
+/* HEROINE */
+.heroine-wrap,.heroine-wrap *,.bubble,.bubble-float,.trap-effect,.float-dmg{pointer-events:none;}
+.heroine-wrap{position:absolute;z-index:10;transition:left .32s ease,top .32s ease;}
+.heroine-wrap img{image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
+.heroine-wrap.stunned img{filter:drop-shadow(0 0 5px rgba(255,220,50,.9)) grayscale(.4);}
+.heroine-wrap.poisoned-state img{filter:drop-shadow(0 0 5px rgba(80,220,80,.8)) hue-rotate(80deg);}
+
+/* BUBBLE */
+.bubble{
+  position:absolute;z-index:25;
+  background:rgba(240,230,220,.95);border:2px solid #6a4a3a;
+  border-radius:8px;padding:3px 7px;
+  font-size:clamp(9px,2.5vw,13px);font-weight:600;color:#3a2010;
+  white-space:nowrap;transform:translateX(-50%);
+  animation:bubble-show .15s ease forwards;
+}
+.bubble::after{content:'';position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);
+  width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:7px solid #6a4a3a;}
+@keyframes bubble-show{0%{opacity:0;transform:translateX(-50%) translateY(4px)}100%{opacity:1;transform:translateX(-50%) translateY(0)}}
+.trap-effect{position:absolute;font-size:1.3em;animation:trap-pop .7s ease forwards;
+  pointer-events:none;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);}
+@keyframes trap-pop{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:1}
+  55%{transform:translate(-50%,-50%) scale(1.8);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(1.1);opacity:0}}
+.float-dmg{position:absolute;font-size:.65em;font-weight:700;color:#ff5a5a;
+  animation:fdmg .9s ease forwards;pointer-events:none;z-index:30;white-space:nowrap;}
+@keyframes fdmg{0%{opacity:1;transform:translateY(0) translateX(-50%)}100%{opacity:0;transform:translateY(-22px) translateX(-50%)}}
+
+/* HEROINE + PALETTE row */
+.mid-row{display:flex;gap:.4em;margin-bottom:.5em;align-items:stretch;}
+
+.heroine-status{
+  background:var(--panel);border:1px solid var(--border);
+  padding:.5em;flex:0 0 110px;
+}
+.heroine-preview{text-align:center;margin-bottom:.2em;height:52px;display:flex;align-items:center;justify-content:center;}
+.heroine-preview img{image-rendering:pixelated;height:48px;}
+.heroine-name{text-align:center;font-size:.55em;color:var(--heroine);letter-spacing:.05em;margin-bottom:.2em;}
+.heroine-speech{font-size:.56em;color:#c090a0;text-align:center;padding:.3em;
+  background:#0e060a;border:1px solid #2a1020;min-height:2em;line-height:1.5;transition:all .3s;}
+.status-tags{display:flex;gap:.2em;flex-wrap:wrap;justify-content:center;margin-top:.3em;min-height:.9em;}
+.status-tag{font-size:.44em;padding:.1em .3em;border:1px solid;letter-spacing:.04em;}
+.tag-poison{border-color:#4a8a1a;color:#8adc4a;}
+.tag-stun{border-color:#8a7a1a;color:#dccc4a;}
+.tag-slow{border-color:#1a4a8a;color:#4a8adc;}
+.tag-lure{border-color:#8a1a8a;color:#dc4adc;}
+
+/* TRAP PALETTE */
+.trap-palette{background:var(--panel);border:1px solid var(--border);padding:.5em;flex:1;min-width:0;}
+.panel-title{font-size:.54em;color:var(--dim);letter-spacing:.14em;margin-bottom:.4em;
+  padding-bottom:.3em;border-bottom:1px solid var(--border);}
+.trap-list{display:grid;grid-template-columns:repeat(3,1fr);gap:.25em;}
+.trap-item{
+  background:#0e0810;border:1px solid var(--border);padding:.35em .15em;
+  cursor:pointer;text-align:center;transition:all .12s;position:relative;
+  touch-action:manipulation;
+}
+.trap-item:active{border-color:var(--gold);background:#160a18;}
+.trap-item.selected{border-color:var(--gold2);background:#1e0e20;box-shadow:0 0 8px rgba(201,168,76,.2);}
+.trap-item.no-pts{opacity:.38;cursor:not-allowed;}
+.trap-icon{font-size:1.15em;display:block;}
+.trap-name{font-size:.43em;color:var(--dim);margin-top:.08em;}
+.trap-ability{font-size:.38em;color:#9060b0;margin-top:.04em;}
+.trap-cost-badge{position:absolute;top:1px;left:2px;font-size:.38em;color:#60b060;}
+
+/* LOG */
+.log-box{background:var(--panel);border:1px solid var(--border);
+  padding:.35em .5em;height:52px;overflow-y:auto;
+  font-size:.6em;line-height:1.7;color:#907060;margin-bottom:.5em;}
+.log-entry.important{color:var(--gold);}
+.log-entry.danger{color:var(--red2);}
+.log-entry.win{color:#6dd68a;}
+.log-entry.recover{color:#6adc6a;}
+
+/* CONTROLS */
+.controls{display:flex;gap:.4em;justify-content:center;flex-wrap:wrap;padding-bottom:.5em;}
+.btn{font-family:'Noto Serif JP',serif;font-size:.75em;padding:.6em 1.1em;
+  border:1px solid;cursor:pointer;letter-spacing:.07em;touch-action:manipulation;min-height:44px;}
+.btn-primary{background:linear-gradient(135deg,#1a0d12,#2a1020);border-color:var(--gold);color:var(--gold);}
+.btn-secondary{background:transparent;border-color:var(--border);color:var(--dim);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+
+.phase-badge{display:inline-block;font-size:.55em;padding:.15em .55em;border:1px solid;letter-spacing:.12em;margin-left:.4em;}
+.phase-set{border-color:var(--teal);color:#5abfa0;}
+.phase-run{border-color:var(--red);color:var(--red2);animation:pulse 1.5s infinite;}
+.phase-wait{border-color:var(--border);color:var(--dim);}
+
+/* OVERLAY */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);
+  display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50;padding:1em;}
+.result-box{background:var(--panel);border:2px solid var(--gold);padding:1.5em 2em;
+  text-align:center;box-shadow:0 0 40px rgba(201,168,76,.3);max-width:360px;width:100%;}
+.result-icon{font-size:3em;margin-bottom:.2em;}
+.result-title{font-family:'Cinzel Decorative',cursive;font-size:1.1em;color:var(--gold);margin-bottom:.4em;}
+.result-desc{font-size:.78em;color:var(--dim);line-height:1.8;margin-bottom:1.2em;white-space:pre-line;}
+</style>
+</head>
+<body>
+
+<!-- TITLE -->
+<div id="title-screen">
+  <div class="title-castle">🏰</div>
+  <div class="title-main">罠師の城</div>
+  <div class="title-sub">DUNGEON TRAP MASTER</div>
+  <div class="title-desc">
+    侵入者フウ（魔法少女）を罠で捕縛せよ。<br><br>
+    <span class="tip">⚙ ルール</span><br>
+    ・罠を配置 → フウを放つ<br>
+    ・罠発動でポイント回復<br>
+    ・スタート・ゴール付近は配置禁止🚫<br>
+    ・木箱📦は無料・5個まで通せんぼ可<br>
+    ・HPゼロで捕縛成功！
+  </div>
+  <button class="btn-start" onclick="startGame()">✦ ゲームを開始 ✦</button>
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay">
+  <div class="result-box">
+    <div class="result-icon" id="result-icon">⛓️</div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-desc" id="result-desc"></div>
+    <button class="btn btn-primary" id="overlay-next">次へ</button>
+    <button class="btn btn-secondary" onclick="retryStage()" style="margin-left:.4em">やり直す</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="game-header">
+    <div class="game-title">罠師の城
+      <span class="phase-badge phase-wait" id="phase-badge">待機中</span>
+    </div>
+    <div class="stage-info" id="stage-info">STAGE 1</div>
+  </div>
+
+  <div class="status-bar">
+    <div class="stat-box"><div class="stat-label">STAGE</div><div class="stat-value" id="ui-stage">1</div></div>
+    <div class="stat-box">
+      <div class="stat-label">フウ HP</div><div class="stat-value" id="ui-hp">80</div>
+      <div class="hp-bar"><div class="hp-fill" id="hp-fill" style="width:100%"></div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">罠ポイント</div><div class="stat-value" id="ui-pts">8</div>
+      <div class="pt-bar"><div class="pt-fill" id="pt-fill" style="width:67%"></div></div>
+    </div>
+    <div class="stat-box"><div class="stat-label">残り時間</div><div class="stat-value timer-value" id="ui-timer">45</div></div>
+  </div>
+
+  <div class="dungeon-view">
+    <div class="dungeon-canvas" id="dungeon-canvas"></div>
+    <div class="heroine-overlay" id="heroine-overlay"></div>
+  </div>
+
+  <div class="mid-row">
+    <div class="heroine-status">
+      <div class="heroine-preview"><img id="heroine-preview-img" src="" alt="フウ"/></div>
+      <div class="heroine-name">フウ / 魔法少女</div>
+      <div class="heroine-speech" id="heroine-speech">「私参上〜っと！」</div>
+      <div class="status-tags" id="status-tags"></div>
+    </div>
+    <div class="trap-palette">
+      <div class="panel-title" id="palette-title">▸ 罠を選択して配置</div>
+      <div class="trap-list" id="trap-list"></div>
+    </div>
+  </div>
+
+  <div class="log-box" id="log-box"></div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="btn-run" onclick="startRun()" disabled>▶ フウを放つ</button>
+    <button class="btn btn-secondary" onclick="clearTraps()">罠をリセット</button>
+    <button class="btn btn-secondary" onclick="showTitle()">タイトルへ</button>
+  </div>
+</div>
+
+<script>
+const ARIA_FRONT = 'data:image/png;base64,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';
+const ARIA_SIDE = 'data:image/png;base64,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';
+const ARIA_BACK = 'data:image/png;base64,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';
+const ARIA_RIGHT = 'data:image/png;base64,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';
+
+// ===== SPEECH DATA =====
+const SPEECHES_NORMAL = [
+  '「にししっ」',
+  '「私参上〜っと！」',
+  '「やっぱ私ってば凄い」',
+  '「この城に宝があるって聞いたのよ！」',
+  '「どんな罠も私には効かないんだから！」',
+  '「私、魔法少女だもん！無敵よ〜！」',
+  '「ちょちょいのちょいよ！」',
+  '「私の魔力を舐めないでよね！」',
+  '「こんな城、楽勝楽勝〜♪」',
+];
+const SPEECHES_DAMAGE = [
+  '「うげっ！？」',
+  '「痛っ！」',
+  '「あだっ！」',
+  '「いったぁ！なにすんの！」',
+  '「ちょっ…！罠！？私が罠に！？」',
+  '「うわわわ！！」',
+  '「ぎゃっ！」',
+  '「や、やるじゃない…！」',
+  '「私がやられるなんて…！」',
+];
+const SPEECHES_STUN = [
+  '「う…動けない…！私が…！？」',
+  '「きゃっ！足が…！」',
+  '「ちょっ…まって！！私、魔法少女なのに！」',
+  '「体が…言うこと聞かない…！」',
+];
+const SPEECHES_POISON = [
+  '「うげ…なんか体が…毒！？私が毒に！？」',
+  '「じわじわ痛い…！毒…！？私の魔力が…」',
+  '「ん…？体がおかしい…毒かしら…」',
+];
+const SPEECHES_ESCAPE = [
+  '「にししっ！逃げ切ったよ〜！」',
+  '「ざんね〜ん！私の勝ち！」',
+  '「私の実力ってやつよ！またね〜！」',
+];
+const SPEECHES_CAPTURE = [
+  '「うぅ…私が…やられた…」',
+  '「こんな…はずじゃ…私が…負けるなんて…」',
+  '「う…ごめんなさい…私の負けです…」',
+  '「私…魔法少女なのに…うぅ…」',
+];
+
+function randSpeech(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// ===== TRAPS =====
+const TRAPS = [
+  { id:'pit',    icon:'🕳️', name:'落とし穴',  cost:2, damage:30, effect:'💥', ability:'stun',   abilityTurns:2, desc:'スタン2ターン' },
+  { id:'swamp',  icon:'🟢', name:'毒沼',       cost:1, damage:4,  effect:'☠️', ability:'poison', poisonDmg:3,   desc:'毒(歩くたび-3)' },
+  { id:'circle', icon:'🔮', name:'誘導魔法陣', cost:2, damage:8,  effect:'✨', ability:'lure',                  desc:'最近の魔法陣に誘導' },
+  { id:'net',    icon:'🕸️', name:'蜘蛛の網',  cost:1, damage:10, effect:'🕸️', ability:'slow',   abilityTurns:3, desc:'鈍足3ターン' },
+  { id:'spike',  icon:'🗡️', name:'針の床',     cost:2, damage:28, effect:'💢', ability:'none',                  desc:'高ダメージ単発' },
+  { id:'ice',    icon:'❄️', name:'氷の罠',     cost:2, damage:12, effect:'🧊', ability:'stun',   abilityTurns:3, desc:'スタン3ターン' },
+  { id:'chain',  icon:'⛓️', name:'鎖の罠',     cost:3, damage:20, effect:'⛓️', ability:'chain',                 desc:'隣接罠も連鎖発動' },
+  { id:'alarm',  icon:'🔔', name:'警報の鐘',   cost:1, damage:2,  effect:'🔔', ability:'none',                  desc:'ダメ小・pt回収' },
+  // Free box
+  { id:'box',    icon:'📦', name:'木箱',        cost:0, damage:0,  effect:'💥', ability:'wall_temp',             desc:'無料・通せんぼ(5個/stage)' },
+];
+
+const STAGES = [
+  { name:'STAGE 1 — 地下牢獄', rows:6, cols:8, timeLimit:45, heroineHP:80, startPts:8, maxPts:12,
+    walls:[[1,1],[1,2],[2,5],[3,2],[4,4],[4,5]], heroineStart:[0,0], goal:[5,7], forbidR:1, desc:'初めての試練！' },
+  { name:'STAGE 2 — 魔術の回廊', rows:6, cols:8, timeLimit:38, heroineHP:110, startPts:8, maxPts:14,
+    walls:[[0,3],[1,1],[2,3],[2,6],[3,0],[3,5],[4,2],[5,4]], heroineStart:[0,0], goal:[5,7], forbidR:1, desc:'フウが強くなった！' },
+  { name:'STAGE 3 — 奈落の間', rows:6, cols:8, timeLimit:32, heroineHP:140, startPts:10, maxPts:16,
+    walls:[[0,2],[0,5],[1,3],[2,1],[2,4],[3,6],[4,1],[4,3],[5,2]], heroineStart:[0,0], goal:[5,7], forbidR:1, desc:'最終試練！' },
+];
+
+// ===== STATE =====
+let S = {};
+
+const stg = () => STAGES[S.stageIdx];
+const ck = (r,c) => `${r},${c}`;
+function isWall(r,c){ return stg().walls.some(w=>w[0]===r&&w[1]===c); }
+function isBox(r,c){ return !!S.boxCells[ck(r,c)]; }
+function isForbidden(r,c){
+  const st=stg(), md=(a,b,x,y)=>Math.abs(a-x)+Math.abs(b-y);
+  return md(r,c,...st.heroineStart)<=st.forbidR || md(r,c,...st.goal)<=st.forbidR;
+}
+
+// BFS
+function bfsNext(fr,fc,tr,tc){
+  const st=stg();
+  if(fr===tr&&fc===tc) return null;
+  const vis={[ck(fr,fc)]:null};
+  const q=[[fr,fc]];
+  const goal=ck(tr,tc);
+  while(q.length){
+    const [r,c]=q.shift();
+    if(ck(r,c)===goal) break;
+    for(const [dr,dc] of [[0,1],[1,0],[0,-1],[-1,0]]){
+      const nr=r+dr,nc=c+dc;
+      if(nr<0||nr>=st.rows||nc<0||nc>=st.cols) continue;
+      if(isWall(nr,nc)||isBox(nr,nc)) continue;
+      const nk=ck(nr,nc);
+      if(nk in vis) continue;
+      vis[nk]=ck(r,c);
+      q.push([nr,nc]);
+    }
+  }
+  if(!(goal in vis)) return null;
+  let cur=goal; const path=[goal];
+  while(vis[cur]!==null&&vis[cur]!==undefined){cur=vis[cur];path.unshift(cur);}
+  if(path.length<2) return null;
+  return path[1].split(',').map(Number);
+}
+
+function nearestCircle(r,c){
+  let best=null,bd=Infinity;
+  for(const [k,t] of Object.entries(S.placedTraps)){
+    if(t.id!=='circle') continue;
+    const [tr,tc]=k.split(',').map(Number);
+    const d=Math.abs(r-tr)+Math.abs(c-tc);
+    if(d<bd){bd=d;best=[tr,tc];}
+  }
+  return best;
+}
+
+// ===== LOAD STAGE =====
+function startGame(){
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game').style.display='block';
+  loadStage(0);
+}
+
+function loadStage(idx){
+  const st=STAGES[idx];
+  clearInterval(S.timerInt); clearInterval(S.moveInt);
+  S={
+    stageIdx:idx, phase:'set', placedTraps:{}, boxCells:{}, boxCount:0,
+    heroinePos:[...st.heroineStart], heroineHP:st.heroineHP, heroineMaxHP:st.heroineHP,
+    timer:st.timeLimit, timerInt:null, moveInt:null,
+    selectedTrap:null, pts:st.startPts, maxPts:st.maxPts,
+    poisoned:false, poisonDmg:0, stunned:0,
+    slowed:0, slowSkip:false, lured:false, lureTarget:null,
+    heroineDir:'front', bubbleTimer:null,
+  };
+  document.getElementById('stage-info').textContent=st.name;
+  document.getElementById('ui-stage').textContent=idx+1;
+  document.getElementById('btn-run').disabled=false;
+  document.getElementById('status-tags').innerHTML='';
+  setPreviewImg('front');
+  refreshStatusBar(); updatePhaseBadge('set');
+  setSpeech('「私参上〜っと！にししっ」');
+  buildGrid(); buildPalette();
+  addLog(`--- ${st.name} ---`,'important');
+  addLog(st.desc);
+}
+
+// ===== GRID =====
+function buildGrid(){
+  const st=stg();
+  const canvas=document.getElementById('dungeon-canvas');
+  canvas.innerHTML='';
+  canvas.style.gridTemplateColumns=`repeat(${st.cols},1fr)`;
+  canvas.style.gridTemplateRows=`repeat(${st.rows},1fr)`;
+  for(let r=0;r<st.rows;r++){
+    for(let c=0;c<st.cols;c++){
+      const el=document.createElement('div');
+      el.className='cell'; el.dataset.r=r; el.dataset.c=c;
+      if(isWall(r,c)){el.classList.add('wall');el.textContent='🧱';}
+      else if(r===st.goal[0]&&c===st.goal[1]){el.classList.add('goal-cell');el.textContent='🚪';}
+      else if(isForbidden(r,c)){el.classList.add('forbidden');el.textContent='🚫';}
+      else el.addEventListener('click',()=>placeTrap(r,c));
+      canvas.appendChild(el);
+    }
+  }
+  for(const [k,t] of Object.entries(S.placedTraps)) { const[r,c]=k.split(',').map(Number); updateCellTrap(r,c,t); }
+  for(const k of Object.keys(S.boxCells)) { const[r,c]=k.split(',').map(Number); updateCellBox(r,c,true); }
+  renderHeroine();
+}
+
+function getCellEl(r,c){ return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
+function updateCellTrap(r,c,trap){
+  const el=getCellEl(r,c); if(!el) return;
+  if(trap){el.classList.add('placed');el.textContent=trap.icon;}
+  else{el.classList.remove('placed');el.textContent='';}
+}
+function updateCellBox(r,c,on){
+  const el=getCellEl(r,c); if(!el) return;
+  if(on){el.classList.add('box-placed');el.textContent='📦';}
+  else{el.classList.remove('box-placed');el.textContent='';}
+}
+
+// ===== PALETTE =====
+function buildPalette(){
+  const list=document.getElementById('trap-list');
+  list.innerHTML='';
+  TRAPS.forEach(t=>{
+    const div=document.createElement('div');
+    div.className='trap-item'; div.id=`tbtn-${t.id}`;
+    const costLabel = t.cost===0 ? '無料' : `${t.cost}pt`;
+    div.innerHTML=`<span class="trap-cost-badge">${costLabel}</span>
+      <span class="trap-icon">${t.icon}</span>
+      <span class="trap-name">${t.name}</span>
+      <span class="trap-ability">${t.desc}</span>`;
+    div.onclick=()=>selectTrap(t.id);
+    list.appendChild(div);
+  });
+  updatePaletteState();
+}
+
+function selectTrap(id){
+  const t=TRAPS.find(x=>x.id===id);
+  if(!t) return;
+  if(t.id==='box' && S.boxCount>=5){addLog('木箱は5個まで！','danger');return;}
+  if(t.cost>0 && S.pts<t.cost){addLog('ポイント不足！','danger');return;}
+  S.selectedTrap=id;
+  document.querySelectorAll('.trap-item').forEach(el=>el.classList.remove('selected'));
+  const btn=document.getElementById(`tbtn-${id}`);
+  if(btn) btn.classList.add('selected');
+}
+
+function updatePaletteState(){
+  TRAPS.forEach(t=>{
+    const btn=document.getElementById(`tbtn-${t.id}`);
+    if(!btn) return;
+    const disabled = (t.id==='box' && S.boxCount>=5) || (t.cost>0 && S.pts<t.cost);
+    btn.classList.toggle('no-pts', disabled);
+  });
+  document.getElementById('palette-title').textContent=`▸ 罠を選択 (${S.pts}pt / 木箱${S.boxCount}/5)`;
+}
+
+function placeTrap(r,c){
+  if(!S.selectedTrap){addLog('罠を選んでください');return;}
+  const key=ck(r,c);
+  const trap=TRAPS.find(x=>x.id===S.selectedTrap);
+
+  // Box mode
+  if(trap.id==='box'){
+    if(S.boxCells[key]){
+      // Remove box
+      delete S.boxCells[key]; S.boxCount--;
+      updateCellBox(r,c,false);
+      updatePaletteState();
+      addLog(`[${r},${c}] 木箱を回収`);
+      return;
+    }
+    if(S.boxCount>=5){addLog('木箱は5個まで！','danger');return;}
+    // Can't place box on top of trap
+    if(S.placedTraps[key]){addLog('罠の上には置けない','danger');return;}
+    S.boxCells[key]=true; S.boxCount++;
+    updateCellBox(r,c,true);
+    updatePaletteState();
+    addLog(`[${r},${c}] 木箱を設置 (${S.boxCount}/5)`);
+    return;
+  }
+
+  // Normal trap
+  if(S.boxCells[key]){addLog('木箱の上には置けない','danger');return;}
+  if(S.placedTraps[key]){
+    const old=S.placedTraps[key];
+    S.pts=Math.min(S.maxPts,S.pts+old.cost);
+    delete S.placedTraps[key];
+    updateCellTrap(r,c,null);
+    refreshStatusBar(); updatePaletteState();
+    addLog(`[${r},${c}] 罠を回収 (+${old.cost}pt)`);
+    return;
+  }
+  if(S.pts<trap.cost){addLog('ポイント不足！','danger');return;}
+  S.pts-=trap.cost;
+  S.placedTraps[key]=trap;
+  updateCellTrap(r,c,trap);
+  refreshStatusBar(); updatePaletteState();
+  addLog(`[${r},${c}] ${trap.icon}${trap.name} 設置`);
+}
+
+function clearTraps(){
+  if(S.phase==='over') return;
+  let refund=0;
+  Object.values(S.placedTraps).forEach(t=>refund+=t.cost);
+  S.placedTraps={}; S.boxCells={}; S.boxCount=0;
+  S.pts=Math.min(S.maxPts,S.pts+refund);
+  buildGrid(); refreshStatusBar(); updatePaletteState();
+  addLog('罠・木箱をリセット');
+}
+
+// ===== RUN =====
+function startRun(){
+  const hasTraps=Object.keys(S.placedTraps).length>0||Object.keys(S.boxCells).length>0;
+  if(!hasTraps){addLog('罠か木箱を置いてから！','danger');return;}
+  S.phase='run';
+  document.getElementById('btn-run').disabled=true;
+  updatePhaseBadge('run');
+  addLog('▶ フウが動き出した！','important');
+  showBubble(randSpeech(SPEECHES_NORMAL));
+
+  S.timerInt=setInterval(()=>{
+    S.timer--;
+    refreshStatusBar();
+    if(S.timer<=0){clearInterval(S.timerInt);clearInterval(S.moveInt);gameOver('時間切れ！フウに脱出された…');}
+  },1000);
+
+  // Keep cells clickable during run
+  // (removed - placement only during set phase)
+
+  // Slower speed: 900ms per step
+  S.moveInt=setInterval(tick, 900);
+}
+
+function tick(){
+  if(S.phase!=='run') return;
+  // Stun
+  if(S.stunned>0){
+    S.stunned--;
+    addLog(`⚡ スタン中… (残${S.stunned})`,'danger');
+    updateStatusTags();
+    if(S.stunned===0){showBubble('「…やっと動ける！私はまだ負けない！」');}
+    return;
+  }
+  // Slow: skip every other
+  if(S.slowed>0){
+    if(S.slowSkip){
+      S.slowSkip=false; S.slowed--;
+      updateStatusTags();
+      return;
+    }
+    S.slowSkip=true;
+  }
+
+  const st=stg();
+  const [r,c]=S.heroinePos;
+  const [gr,gc]=st.goal;
+  let tr=gr,tc=gc;
+
+  // Lure
+  if(S.lured&&S.lureTarget){
+    const [lr,lc]=S.lureTarget;
+    if(S.placedTraps[ck(lr,lc)]?.id==='circle'){tr=lr;tc=lc;}
+    else{S.lured=false;S.lureTarget=null;}
+  }
+
+  const next=bfsNext(r,c,tr,tc);
+  if(!next){
+    const alt=bfsNext(r,c,gr,gc);
+    if(alt){doMove(alt[0],alt[1]);return;}
+    addLog('行き詰まり…');
+    return;
+  }
+  doMove(next[0],next[1]);
+}
+
+function doMove(nr,nc){
+  const st=stg();
+  const [pr,pc]=S.heroinePos;
+  // Determine direction for sprite
+  if(nr>pr){ S.heroineDir='front'; S.heroineFlip=false; }
+  else if(nr<pr){ S.heroineDir='back'; S.heroineFlip=false; }
+  else if(nc>pc){ S.heroineDir='side'; S.heroineFlip=false; }  // moving right: normal side
+  else { S.heroineDir='side'; S.heroineFlip=true; }             // moving left: flip side
+  S.heroinePos=[nr,nc];
+
+  // Poison tick
+  if(S.poisoned){
+    applyDmg(S.poisonDmg,`☠️ 毒 -${S.poisonDmg}HP`);
+    if(S.heroineHP<=0){renderHeroine();capture();return;}
+  }
+
+  renderHeroine();
+
+  // Check trap
+  const key=ck(nr,nc);
+  if(S.placedTraps[key]){
+    const trap=S.placedTraps[key];
+    if(trap.ability==='chain'){
+      [[0,1],[1,0],[0,-1],[-1,0]].forEach(([dr,dc])=>{
+        const ak=ck(nr+dr,nc+dc);
+        if(S.placedTraps[ak]){
+          const at=S.placedTraps[ak];
+          addLog(`⛓️ 連鎖！${at.icon}${at.name} -${at.damage}HP`,'danger');
+          applyDmg(at.damage);
+          showFx(nr+dr,nc+dc,at.effect);
+          recoverPts(Math.max(1,Math.floor(at.cost*0.6)));
+          delete S.placedTraps[ak]; updateCellTrap(nr+dr,nc+dc,null);
+        }
+      });
+    }
+    triggerTrap(trap,nr,nc);
+    delete S.placedTraps[key]; updateCellTrap(nr,nc,null);
+    if(S.heroineHP<=0){capture();return;}
+  }
+
+  // Goal check
+  if(nr===st.goal[0]&&nc===st.goal[1]){
+    clearInterval(S.timerInt); clearInterval(S.moveInt);
+    showBubble(randSpeech(SPEECHES_ESCAPE));
+    setTimeout(()=>gameOver('脱出された！フウは宝を手に入れた！'),600);
+  }
+}
+
+function triggerTrap(trap,r,c){
+  applyDmg(trap.damage,`${trap.icon}${trap.name} -${trap.damage}HP`);
+  showBubble(randSpeech(SPEECHES_DAMAGE));
+  showFx(r,c,trap.effect);
+  recoverPts(trap.cost);
+  switch(trap.ability){
+    case 'poison':
+      if(!S.poisoned){S.poisoned=true;S.poisonDmg=trap.poisonDmg||3;
+        addLog(`☠️ 毒状態！移動ごとに-${S.poisonDmg}`,'danger');
+        showBubble(randSpeech(SPEECHES_POISON));}
+      break;
+    case 'stun':
+      S.stunned+=(trap.abilityTurns||2);
+      addLog(`⚡ スタン${trap.abilityTurns}ターン！`,'danger');
+      showBubble(randSpeech(SPEECHES_STUN));
+      break;
+    case 'slow':
+      S.slowed+=(trap.abilityTurns||3);S.slowSkip=false;
+      addLog(`🕸️ 鈍足${trap.abilityTurns}ターン！`,'danger');
+      break;
+    case 'lure':{
+      const tgt=nearestCircle(r,c);
+      if(tgt){S.lured=true;S.lureTarget=tgt;addLog(`🔮 魔法陣[${tgt[0]},${tgt[1]}]へ誘導！`,'danger');}
+      break;}
+  }
+  updateStatusTags();
+  const ratio=S.heroineHP/S.heroineMaxHP;
+  // Expression change handled by sprite direction
+}
+
+function applyDmg(dmg,msg){
+  S.heroineHP=Math.max(0,S.heroineHP-dmg);
+  refreshStatusBar();
+  if(msg) addLog(msg,'danger');
+  const overlay=document.getElementById('heroine-overlay');
+  const st=stg();
+  const canvas=document.getElementById('dungeon-canvas');
+  const cw=canvas.offsetWidth/st.cols,ch=canvas.offsetHeight/st.rows;
+  const [r,c]=S.heroinePos;
+  const fd=document.createElement('div');
+  fd.className='float-dmg';
+  fd.textContent=`-${dmg}`;
+  fd.style.left=(c*cw+cw/2)+'px';
+  fd.style.top=(r*ch+4)+'px';
+  overlay.appendChild(fd);
+  setTimeout(()=>fd.remove(),950);
+}
+
+function recoverPts(amt){
+  const before=S.pts;
+  S.pts=Math.min(S.maxPts,S.pts+amt);
+  const got=S.pts-before;
+  if(got>0){
+    addLog(`✦ +${got}pt 回収 (${S.pts}/${S.maxPts})`,'recover');
+    refreshStatusBar(); updatePaletteState();
+  }
+}
+
+function rebindCells(){
+  document.querySelectorAll('.cell:not(.wall):not(.goal-cell):not(.forbidden)').forEach(el=>{
+    const r=+el.dataset.r,c=+el.dataset.c;
+    el.onclick=()=>placeTrap(r,c);
+  });
+}
+
+function showFx(r,c,efx){
+  const el=getCellEl(r,c); if(!el) return;
+  const fx=document.createElement('div');
+  fx.className='trap-effect'; fx.textContent=efx;
+  el.appendChild(fx); setTimeout(()=>fx.remove(),750);
+}
+
+function capture(){
+  clearInterval(S.timerInt); clearInterval(S.moveInt);
+  setTimeout(winGame,300);
+}
+
+// ===== RENDER =====
+function getAriaImg(dir, flip){
+  if(dir==='front') return ARIA_FRONT;
+  if(dir==='back') return ARIA_BACK;
+  if(dir==='side' && !flip) return ARIA_RIGHT; // moving right = right-facing sprite
+  return ARIA_SIDE; // moving left = left-facing sprite (original side image faces left)
+}
+
+function setPreviewImg(dir){
+  const img=document.getElementById('heroine-preview-img');
+  if(img) img.src=getAriaImg(dir, S.heroineFlip||false);
+}
+
+function renderHeroine(){
+  const overlay=document.getElementById('heroine-overlay');
+  // Remove old heroine+bubbles from overlay
+  overlay.querySelectorAll('.heroine-wrap,.bubble-float').forEach(e=>e.remove());
+  const [r,c]=S.heroinePos;
+  const st=stg();
+  const canvas=document.getElementById('dungeon-canvas');
+  const cw=canvas.offsetWidth/st.cols, ch=canvas.offsetHeight/st.rows;
+
+  const wrap=document.createElement('div');
+  wrap.className='heroine-wrap';
+  if(S.stunned>0) wrap.classList.add('stunned');
+  if(S.poisoned) wrap.classList.add('poisoned-state');
+
+  const img=document.createElement('img');
+  img.src=getAriaImg(S.heroineDir, S.heroineFlip);
+  img.style.height='52px';
+  img.style.imageRendering='pixelated';
+  wrap.appendChild(img);
+
+  const imgW = S.heroineDir==='back'?52:(S.heroineDir==='front'?46:26);
+  wrap.style.left=(c*cw + cw/2 - imgW/2)+'px';
+  wrap.style.top=(r*ch + ch/2 - 26)+'px';
+  overlay.appendChild(wrap);
+  setPreviewImg(S.heroineDir);
+}
+
+// ===== SPEECH BUBBLE =====
+function showBubble(text){
+  setSpeech(text);
+  const overlay=document.getElementById('heroine-overlay');
+  const [r,c]=S.heroinePos;
+  const st=stg();
+  const canvas=document.getElementById('dungeon-canvas');
+  const cw=canvas.offsetWidth/st.cols, ch=canvas.offsetHeight/st.rows;
+
+  overlay.querySelectorAll('.bubble-float').forEach(e=>e.remove());
+
+  const bub=document.createElement('div');
+  bub.className='bubble bubble-float';
+  bub.textContent=text;
+  bub.style.left=(c*cw+cw/2)+'px';
+  bub.style.top=Math.max(4, r*ch-30)+'px';
+  overlay.appendChild(bub);
+
+  if(S.bubbleTimer) clearTimeout(S.bubbleTimer);
+  S.bubbleTimer=setTimeout(()=>{
+    overlay.querySelectorAll('.bubble-float').forEach(e=>e.remove());
+  },2200);
+}
+
+function setSpeech(t){ document.getElementById('heroine-speech').textContent=t; }
+
+function refreshStatusBar(){
+  document.getElementById('ui-hp').textContent=Math.max(0,S.heroineHP);
+  document.getElementById('hp-fill').style.width=(S.heroineHP/S.heroineMaxHP*100)+'%';
+  document.getElementById('ui-pts').textContent=S.pts;
+  document.getElementById('pt-fill').style.width=(S.pts/S.maxPts*100)+'%';
+  document.getElementById('ui-timer').textContent=S.timer;
+  document.getElementById('ui-timer').classList.toggle('urgent',S.timer<=10);
+}
+
+function updateStatusTags(){
+  const box=document.getElementById('status-tags');
+  box.innerHTML='';
+  const add=(cls,txt)=>{const t=document.createElement('span');t.className='status-tag '+cls;t.textContent=txt;box.appendChild(t);};
+  if(S.poisoned) add('tag-poison','☠️ 毒');
+  if(S.stunned>0) add('tag-stun',`⚡ スタン${S.stunned}`);
+  if(S.slowed>0) add('tag-slow',`🕸️ 鈍足${S.slowed}`);
+  if(S.lured) add('tag-lure','🔮 誘導');
+}
+
+function updatePhaseBadge(p){
+  const b=document.getElementById('phase-badge');
+  b.className='phase-badge';
+  if(p==='set'){b.classList.add('phase-set');b.textContent='配置フェーズ';}
+  else if(p==='run'){b.classList.add('phase-run');b.textContent='実行中！';}
+  else{b.classList.add('phase-wait');b.textContent='終了';}
+}
+
+function addLog(msg,cls=''){
+  const box=document.getElementById('log-box');
+  const e=document.createElement('div');
+  e.className='log-entry '+cls; e.textContent=msg;
+  box.appendChild(e); box.scrollTop=box.scrollHeight;
+}
+
+// ===== WIN / LOSE =====
+function winGame(){
+  S.phase='over'; updatePhaseBadge('wait');
+  S.heroineDir='front'; renderHeroine();
+  showBubble(randSpeech(SPEECHES_CAPTURE));
+  setSpeech(randSpeech(SPEECHES_CAPTURE));
+  addLog('★ 捕縛成功！★','win');
+  showOverlay('⛓️','捕縛成功！',
+    `フウを捕縛した！\nHP: ${Math.max(0,S.heroineHP)} / ${S.heroineMaxHP}\n残り時間: ${S.timer}秒`,true);
+}
+
+function gameOver(reason){
+  S.phase='over'; updatePhaseBadge('wait');
+  addLog('× '+reason,'danger');
+  showOverlay('💨','失敗…',reason+'\nもう一度罠を仕掛けろ！',false);
+}
+
+function showOverlay(icon,title,desc,isWin){
+  document.getElementById('result-icon').textContent=icon;
+  document.getElementById('result-title').textContent=title;
+  document.getElementById('result-desc').textContent=desc;
+  document.getElementById('overlay').style.display='flex';
+  const btn=document.getElementById('overlay-next');
+  if(!isWin){btn.textContent='もう一度';btn.onclick=retryStage;}
+  else if(S.stageIdx>=STAGES.length-1){btn.textContent='✦ 全クリア！タイトルへ ✦';btn.onclick=showTitle;}
+  else{btn.textContent='次のステージへ →';btn.onclick=nextStage;}
+}
+
+function nextStage(){document.getElementById('overlay').style.display='none';loadStage(S.stageIdx+1);}
+function retryStage(){document.getElementById('overlay').style.display='none';loadStage(S.stageIdx);}
+function showTitle(){
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('game').style.display='none';
+  document.getElementById('title-screen').style.display='flex';
+  clearInterval(S.timerInt); clearInterval(S.moveInt);
+}
+
+</script>
+</body>
+</html>

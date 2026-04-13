@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ENDING — ESCAPE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=DotGothic16&display=swap');
+
+:root {
+  --bg: #09090f;
+  --surface: #0e0e18;
+  --border: rgba(255,255,255,0.08);
+  --accent: #f5d000;
+  --text: #ede8df;
+  --dim: rgba(237,232,223,0.45);
+  --name-color: #f5d000;
+  --box-bg: rgba(9,9,15,0.82);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  width:100%; height:100%;
+  background:var(--bg);
+  overflow:hidden;
+  touch-action:none;
+  user-select:none;
+  cursor:pointer;
+}
+
+/* ===== SCENE WRAPPER ===== */
+#scene {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: 1;
+}
+
+/* ===== BACKGROUND ===== */
+#bg-layer {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 30%, #12112a 0%, #09090f 100%);
+  transition: background 1.2s ease;
+}
+
+/* ノイズテクスチャ */
+#bg-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* 光のライン装飾 */
+.deco-line {
+  position: absolute;
+  background: linear-gradient(90deg, transparent, rgba(245,208,0,0.08), transparent);
+  height: 1px;
+  width: 70%;
+  left: 15%;
+}
+.deco-line.top    { top: 18%; }
+.deco-line.bottom { bottom: 18%; }
+
+/* ===== ILLUST FRAME ===== */
+#illust-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: min(220px, 35vh);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#illust-frame {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+/* 仮置き四角 */
+#illust-placeholder {
+  width: min(300px, 72vw);
+  height: min(380px, 55vw);
+  /* ↑ 後でイラストに合わせてサイズ変更 */
+  background: linear-gradient(160deg, #1a1830 0%, #120f22 60%, #1a1020 100%);
+  border: 1px solid rgba(245,208,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 仮置きの内側装飾 */
+#illust-placeholder::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px dashed rgba(245,208,0,0.12);
+}
+#illust-placeholder::after {
+  content: '[ ILLUST ]';
+  font-family: 'DotGothic16', monospace;
+  font-size: 11px;
+  color: rgba(245,208,0,0.25);
+  letter-spacing: 4px;
+}
+
+/* 実際のイラスト画像（後で使う） */
+#illust-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none; /* イラスト差し替え時に display:block にする */
+  image-rendering: pixelated;
+}
+
+/* キャラ入場アニメ */
+#illust-frame.enter {
+  animation: charEnter 0.7s cubic-bezier(.22,1,.36,1) forwards;
+}
+@keyframes charEnter {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#illust-frame.exit {
+  animation: charExit 0.5s ease-in forwards;
+}
+@keyframes charExit {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ===== TEXT BOX ===== */
+#textbox {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  min-height: min(200px, 32vh);
+  padding: clamp(16px,4vw,24px) clamp(16px,5vw,32px) clamp(20px,5vw,28px);
+  background: var(--box-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 0.4s;
+}
+
+/* 上辺の光ライン */
+#textbox::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,208,0,0.4), transparent);
+}
+
+/* 名前プレート */
+#name-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+#char-name {
+  font-family: 'DotGothic16', monospace;
+  font-size: clamp(12px, 3.5vw, 14px);
+  color: var(--name-color);
+  letter-spacing: 3px;
+  transition: opacity 0.3s;
+}
+.name-dash {
+  width: 20px; height: 1px;
+  background: rgba(245,208,0,0.4);
+}
+
+/* メッセージ本文 */
+#message-text {
+  font-family: 'Shippori Mincho', serif;
+  font-size: clamp(14px, 4vw, 17px);
+  color: var(--text);
+  line-height: 1.95;
+  letter-spacing: 0.04em;
+  min-height: 3.9em; /* 2行分確保 */
+  position: relative;
+}
+
+/* タイプライターカーソル */
+#cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--text);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: cursorBlink 0.8s steps(1) infinite;
+}
+@keyframes cursorBlink { 50% { opacity: 0; } }
+
+/* 続きを示す▼ */
+#next-indicator {
+  position: absolute;
+  right: 0; bottom: -6px;
+  font-size: 10px;
+  color: var(--accent);
+  opacity: 0;
+  animation: indicatorBounce 1s ease-in-out infinite;
+  transition: opacity 0.4s;
+}
+#next-indicator.show { opacity: 1; }
+@keyframes indicatorBounce {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(4px); }
+}
+
+/* テキストボックス下部 */
+#textbox-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+#progress-text {
+  font-family: 'DotGothic16', monospace;
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 2px;
+}
+#skip-btn {
+  font-family: 'DotGothic16', monospace;
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 2px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: all 0.2s;
+}
+#skip-btn:hover, #skip-btn:active { color: var(--accent); border-color: var(--accent); }
+
+/* ===== SCENE TRANSITION ===== */
+#transition-overlay {
+  position: fixed;
+  inset: 0;
+  background: #09090f;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+#transition-overlay.fade-in  { opacity: 1; }
+#transition-overlay.fade-out { opacity: 0; }
+
+/* ===== TITLE CARD (冒頭タイトル演出用) ===== */
+#title-card {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+  background: #09090f;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s;
+}
+#title-card.show { opacity: 1; pointer-events: all; }
+
+.title-eyebrow {
+  font-family: 'DotGothic16', monospace;
+  font-size: clamp(10px,3vw,12px);
+  color: var(--dim);
+  letter-spacing: 6px;
+  margin-bottom: 20px;
+  animation: fadeUp 1s ease 0.3s both;
+}
+.title-main {
+  font-family: 'DotGothic16', monospace;
+  font-size: clamp(28px,9vw,52px);
+  color: var(--accent);
+  letter-spacing: clamp(8px,3vw,16px);
+  text-shadow: 0 0 40px rgba(245,208,0,0.4);
+  animation: fadeUp 1s ease 0.6s both;
+}
+.title-sub {
+  font-family: 'Shippori Mincho', serif;
+  font-size: clamp(11px,3vw,13px);
+  color: var(--dim);
+  letter-spacing: 4px;
+  margin-top: 14px;
+  animation: fadeUp 1s ease 0.9s both;
+}
+.title-tap {
+  font-family: 'DotGothic16', monospace;
+  font-size: 10px;
+  color: rgba(245,208,0,0.35);
+  letter-spacing: 3px;
+  margin-top: 48px;
+  animation: fadeUp 1s ease 1.4s both, blink 1.4s steps(1) 2s infinite;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:none; }
+}
+@keyframes blink { 50% { opacity:0; } }
+
+/* ===== AUTO NEXT INDICATOR ===== */
+#auto-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  width: 0%;
+  opacity: 0;
+  transition: width linear, opacity 0.3s;
+  z-index: 50;
+}
+
+/* ===== PARTICLE ===== */
+.particle {
+  position: fixed;
+  width: 2px; height: 2px;
+  background: rgba(245,208,0,0.5);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particleFall linear infinite;
+  z-index: 1;
+}
+@keyframes particleFall {
+  from { transform: translateY(-10px); opacity: 0.6; }
+  to   { transform: translateY(100vh); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- フェードオーバーレイ -->
+<div id="transition-overlay"></div>
+
+<!-- タイトルカード -->
+<div id="title-card" class="show">
+  <div class="title-eyebrow">— ENDING —</div>
+  <div class="title-main">ESCAPE</div>
+  <div class="title-sub">脱出、完了。</div>
+  <div class="title-tap" id="title-tap">TAP TO START</div>
+</div>
+
+<!-- シーン本体 -->
+<div id="scene">
+
+  <!-- 背景 -->
+  <div id="bg-layer">
+    <div class="deco-line top"></div>
+    <div class="deco-line bottom"></div>
+  </div>
+
+  <!-- イラスト -->
+  <div id="illust-area">
+    <div id="illust-frame">
+      <img id="illust-img" src="illust.jpg" alt="character"
+           style="max-width:min(340px,80vw);max-height:calc(100vh - min(220px,35vh) - 20px);width:auto;height:auto;object-fit:contain;display:block;">
+    </div>
+  </div>
+
+  <!-- テキストボックス -->
+  <div id="textbox">
+    <div id="name-plate">
+      <span id="char-name"></span>
+      <div class="name-dash" id="name-dash" style="display:none"></div>
+    </div>
+    <div id="message-text">
+      <span id="message-body"></span>
+      <span id="cursor"></span>
+      <div id="next-indicator">▼</div>
+    </div>
+    <div id="textbox-footer">
+      <div id="progress-text">0 / 0</div>
+      <div id="skip-btn" onclick="skipAll()">SKIP ▶▶</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 自動送りバー -->
+<div id="auto-bar"></div>
+
+<script>
+// ============================================================
+// SCRIPT DATA
+// ============================================================
+// 各エントリの構造:
+// {
+//   name: "キャラ名" or "" (地の文は空),
+//   text: "セリフ or 地の文",
+//   illust: "normal" | "surprised" | "smile" | ... (後でイラスト差し替え時に使用),
+//   bg: "dark" | "light" | null,  // 背景変更
+//   speed: 40,  // タイプ速度ms（省略で40）
+//   pause: 0,   // 表示後の自動待機ms（省略で0＝手動送り）
+// }
+
+const SCRIPT = [
+  {
+    name: "",
+    text: "ふぅ、なんとかなったようだ",
+    illust: "normal",
+    speed: 50,
+  },
+  {
+    name: "",
+    text: "まったく、手のかかる部屋だったよ",
+    illust: "normal",
+    speed: 45,
+  },
+  {
+    name: "",
+    text: "……そこの君。君のことだよ",
+    illust: "normal",
+    speed: 45,
+  },
+  {
+    name: "",
+    text: "礼を言うのは柄じゃないのだがね",
+    illust: "normal",
+    speed: 45,
+  },
+  {
+    name: "",
+    text: "ま、悪くない働きだったよ。認めてあげよう",
+    illust: "normal",
+    speed: 45,
+  },
+  {
+    name: "",
+    text: "君がいなければ今頃まだあの部屋で途方に暮れていたかもしれない",
+    illust: "normal",
+    speed: 45,
+  },
+  {
+    name: "",
+    text: "……ありがとう、と言っておくよ。一度だけ、ね",
+    illust: "smile",
+    speed: 55,
+  },
+  {
+    name: "",
+    text: "また次があるなら、そのときも頼むよ",
+    illust: "smile",
+    speed: 45,
+  },
+];
+
+// ============================================================
+// ENGINE
+// ============================================================
+let idx = 0;
+let typing = false;
+let typeTimer = null;
+let charIdx = 0;
+let waitingNext = false;
+
+// タイトルカードのタップ
+document.getElementById('title-card').addEventListener('click', startNovel);
+document.getElementById('title-card').addEventListener('touchend', e => { e.preventDefault(); startNovel(); });
+
+function startNovel() {
+  const card = document.getElementById('title-card');
+  card.style.opacity = '0';
+  card.style.transition = 'opacity 0.6s';
+  setTimeout(() => {
+    card.style.display = 'none';
+    spawnParticles();
+    showEntry(0);
+  }, 650);
+}
+
+function showEntry(i) {
+  if (i >= SCRIPT.length) { onEnd(); return; }
+  idx = i;
+  const entry = SCRIPT[i];
+  waitingNext = false;
+
+  // 名前
+  const nameEl = document.getElementById('char-name');
+  const dashEl = document.getElementById('name-dash');
+  if (entry.name) {
+    nameEl.textContent = entry.name;
+    dashEl.style.display = 'block';
+  } else {
+    nameEl.textContent = '';
+    dashEl.style.display = 'none';
+  }
+
+  // イラスト切り替え（後で拡張）
+  updateIllust(entry.illust || 'normal');
+
+  // 背景変更
+  if (entry.bg) updateBg(entry.bg);
+
+  // タイプ開始
+  typeText(entry.text, entry.speed || 40, () => {
+    document.getElementById('next-indicator').classList.add('show');
+    waitingNext = true;
+    // 自動送り
+    if (entry.pause) {
+      setTimeout(() => { if (waitingNext) next(); }, entry.pause);
+    }
+  });
+
+  // 進捗
+  document.getElementById('progress-text').textContent = `${i+1} / ${SCRIPT.length}`;
+}
+
+function typeText(text, speed, onDone) {
+  const body = document.getElementById('message-body');
+  body.textContent = '';
+  document.getElementById('next-indicator').classList.remove('show');
+  document.getElementById('cursor').style.display = 'inline-block';
+  typing = true;
+  charIdx = 0;
+
+  if (typeTimer) clearInterval(typeTimer);
+  typeTimer = setInterval(() => {
+    if (charIdx >= text.length) {
+      clearInterval(typeTimer);
+      typing = false;
+      document.getElementById('cursor').style.display = 'none';
+      onDone && onDone();
+      return;
+    }
+    body.textContent += text[charIdx++];
+  }, speed);
+}
+
+function next() {
+  if (typing) {
+    // タイプ中なら即表示
+    clearInterval(typeTimer);
+    typing = false;
+    document.getElementById('message-body').textContent = SCRIPT[idx].text;
+    document.getElementById('cursor').style.display = 'none';
+    document.getElementById('next-indicator').classList.add('show');
+    waitingNext = true;
+    return;
+  }
+  if (!waitingNext) return;
+
+  // フェードなしで次へ
+  document.getElementById('next-indicator').classList.remove('show');
+  showEntry(idx + 1);
+}
+
+function skipAll() {
+  // 最後のエントリまでジャンプ
+  if (typeTimer) clearInterval(typeTimer);
+  typing = false;
+  waitingNext = false;
+  onEnd();
+}
+
+function onEnd() {
+  // テキスト送り完了 → エンドクレジットカードを出してからオープニングへ
+  showEndCard();
+}
+
+function showEndCard() {
+  const card = document.getElementById('end-card');
+  card.classList.add('show');
+}
+
+function fade(cb) {
+  const overlay = document.getElementById('transition-overlay');
+  overlay.style.transition = 'opacity 0.6s';
+  overlay.classList.add('fade-in');
+  setTimeout(cb, 650);
+}
+
+// ============================================================
+// ILLUST SWITCHER
+// ============================================================
+// 後でイラストを複数用意する場合、ここで切り替え
+// illust: 'normal' | 'smile' | 'surprised' | etc.
+const ILLUST_MAP = {
+  // 'normal':    'img/normal.png',
+  // 'smile':     'img/smile.png',
+  // 'surprised': 'img/surprised.png',
+};
+
+function updateIllust(state) {
+  // illust.png を差し替えるだけでOK
+  // 複数差分を使う場合は ILLUST_MAP に追加して src を切り替え
+  const img = document.getElementById('illust-img');
+  if (ILLUST_MAP[state]) {
+    img.src = ILLUST_MAP[state];
+  }
+}
+
+// ============================================================
+// BG SWITCHER
+// ============================================================
+function updateBg(mode) {
+  const bg = document.getElementById('bg-layer');
+  const gradients = {
+    dark:  'radial-gradient(ellipse 80% 60% at 50% 30%, #12112a 0%, #09090f 100%)',
+    light: 'radial-gradient(ellipse 80% 60% at 50% 30%, #1a1830 0%, #0d0c1f 100%)',
+    warm:  'radial-gradient(ellipse 80% 60% at 50% 30%, #1f1510 0%, #09090f 100%)',
+  };
+  if (gradients[mode]) bg.style.background = gradients[mode];
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+// タップ / クリック
+document.addEventListener('click', e => {
+  if (document.getElementById('title-card').style.display !== 'none' &&
+      !document.getElementById('title-card').style.opacity) return;
+  if (e.target.id === 'skip-btn' || e.target.closest('#title-card')) return;
+  next();
+});
+
+// スワイプ（上方向 or 右方向）
+let touchX = 0, touchY = 0;
+document.addEventListener('touchstart', e => {
+  touchX = e.touches[0].clientX;
+  touchY = e.touches[0].clientY;
+}, {passive: true});
+document.addEventListener('touchend', e => {
+  if (e.target.closest('#title-card') || e.target.id === 'skip-btn') return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  const dy = e.changedTouches[0].clientY - touchY;
+  // スワイプ判定
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10) { next(); return; } // タップ
+  if (dy < -20 || dx > 30) next(); // 上スワイプ or 右スワイプで送り
+}, {passive: true});
+
+// キーボード
+document.addEventListener('keydown', e => {
+  if (['Enter','Space','ArrowRight'].includes(e.code)) { e.preventDefault(); next(); }
+});
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function goOpening() {
+  fade(() => { window.location.href = 'opening.html'; });
+}
+
+// エンドカード表示中もタップでオープニングへ
+document.addEventListener('click', e => {
+  const card = document.getElementById('end-card');
+  if (card.classList.contains('show') && !e.target.closest('.ec-btn')) {
+    goOpening();
+  }
+});
+
+// ============================================================
+// PARTICLES（雰囲気演出）
+// ============================================================
+function spawnParticles() {
+  for (let i = 0; i < 12; i++) {
+    setTimeout(() => {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.animationDuration = (8 + Math.random() * 14) + 's';
+      p.style.animationDelay = (Math.random() * 6) + 's';
+      p.style.opacity = (0.1 + Math.random() * 0.4).toString();
+      p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+      document.body.appendChild(p);
+    }, i * 200);
+  }
+}
+</script>
+
+<!-- END CARD -->
+<div id="end-card">
+  <div class="ec-inner">
+    <div class="ec-label">— FIN —</div>
+    <div class="ec-title">ESCAPE</div>
+    <div class="ec-sub">謎の部屋からの脱出</div>
+    <div class="ec-btns">
+      <button class="ec-btn primary" onclick="goOpening()">▶ もう一度はじめから</button>
+      <button class="ec-btn" onclick="goOpening()">▶ OPENING へ</button>
+    </div>
+    <div class="ec-tap-hint">TAP ANYWHERE TO REPLAY</div>
+  </div>
+</div>
+
+</body>
+</html>

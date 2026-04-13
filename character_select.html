@@ -1,0 +1,232 @@
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>キャラクターセレクト</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DotGothic16&display=swap');
+
+:root {
+  --bg: #0d0d1a;
+  --panel: #13132a;
+  --border: #2a2a5a;
+  --accent: #00eeff;
+  --gold: #ffd700;
+  --text: #e0e8ff;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
+  font-family: 'DotGothic16', monospace;
+  color: var(--text);
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  text-align:center;
+  margin:30px 0;
+}
+
+.select-text {
+  font-size:13px;
+  opacity:0.6;
+  margin-bottom:10px;
+}
+
+.header h1 {
+  font-family:'Press Start 2P';
+  color:var(--accent);
+  margin-bottom:15px;
+}
+
+/* ボタン */
+.confirm-btn {
+  background: var(--gold);
+  color:#000;
+  border:none;
+  font-family:'Press Start 2P';
+  font-size:10px;
+  padding:12px 20px;
+  cursor:pointer;
+}
+
+.confirm-btn:disabled {
+  background:#333;
+  color:#666;
+}
+
+/* ===== グリッド ===== */
+.grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+  max-width:1000px;
+  margin:auto;
+}
+
+/* ===== カード ===== */
+.card {
+  background: var(--panel);
+  border:2px solid var(--border);
+  padding:10px;
+  cursor:pointer;
+  position:relative;
+  text-align:center;
+  height:220px;
+}
+
+.card img {
+  height:120px;
+  image-rendering:pixelated;
+}
+
+/* ===== ロック ===== */
+.card.locked {
+  opacity:0.35;
+  pointer-events:none;
+  filter:grayscale(70%);
+}
+
+.card.locked::after {
+  content:"COMING SOON";
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:10px;
+  background:rgba(0,0,0,0.6);
+}
+
+/* ===== 未来ボックス（サイズ完全一致） ===== */
+.future-grid {
+  margin-top:40px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:20px;
+  max-width:1000px;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+.future-card {
+  height:220px;
+  background: var(--panel);
+  border:2px dashed var(--border);
+  position:relative;
+}
+
+.future-card::after {
+  content:"COMING SOON";
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:10px;
+  opacity:0.4;
+}
+</style>
+</head>
+
+<body>
+
+<audio id="bgm" src="Starting_Lineup.mp3" loop></audio>
+
+<div class="header">
+  <!-- 一番上に移動 -->
+  <div class="select-text">▶ キャラクターを選択してください</div>
+  <h1>CHARACTER SELECT</h1>
+  <button class="confirm-btn" id="confirm-btn" disabled>▶ けってい</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="future-grid" id="future-grid"></div>
+
+<script>
+
+/* ===== BGM ===== */
+const bgm = document.getElementById("bgm");
+bgm.volume = 0.1;
+document.body.addEventListener("click", () => {
+  if (bgm.paused) bgm.play();
+}, { once:true });
+
+/* ===== 画像（そのまま使う） ===== */
+const IMGS = {
+  sui: "sui.png",
+  kako: "kako.png",
+  chika: "chika.png",
+  fuu: "fuu.png",
+  erika: "erika.png",
+  jely: "jely.png"
+};
+
+/* ===== データ ===== */
+const CHARS = [
+  {key:"sui", name:"スイ", game:"蜘蛛固めアクション", desc:"クモの糸で敵を絡め取れ！", link:"sui/index.html"},
+  {key:"kako", name:"カコ", game:"直感リズムでパンチ", desc:"ビートに乗ってノックアウト！", link:"kako/index.html"},
+  {key:"chika", name:"チカ", game:"脱出エスケープ", desc:"迷宮から華麗に脱出せよ！", link:"chika/escape_game.html"},
+  {key:"fuu", name:"フウ", game:"罠を張ってキャッチ", desc:"策士の罠で獲物を仕留めろ！", link:"fuu/index.html"},
+  {key:"erika", name:"エリカ", game:"叩いてとろけて", desc:"タイミングよく叩き続けろ！", link:"erika/index.html"},
+  {key:"jely", name:"ジェリー", game:"避けて避けて", desc:"天使の加護で弾をかわせ！", link:"jely/index.html"}
+];
+
+const grid = document.getElementById("grid");
+const btn = document.getElementById("confirm-btn");
+
+let selected = null;
+
+/* ===== カード生成 ===== */
+CHARS.forEach(char=>{
+  const card = document.createElement("div");
+  card.className = "card";
+
+  card.innerHTML = `
+    <img src="${IMGS[char.key]}">
+    <div>${char.name}</div>
+    <div style="font-size:12px;opacity:0.8">${char.game}</div>
+    <div style="font-size:10px;opacity:0.6">${char.desc}</div>
+  `;
+
+  if (char.key==="erika" || char.key==="jely") {
+    card.classList.add("locked");
+  } else {
+    card.onclick = ()=>{
+      selected = char;
+      btn.disabled = false;
+    };
+  }
+
+  grid.appendChild(card);
+});
+
+/* ===== 決定 ===== */
+btn.onclick = ()=>{
+  if(selected){
+    location.href = selected.link;
+  }
+};
+
+/* ===== ？ボックス ===== */
+const future = document.getElementById("future-grid");
+
+for(let i=0;i<6;i++){
+  const box = document.createElement("div");
+  box.className = "future-card";
+  future.appendChild(box);
+}
+
+</script>
+
+</body>
+</html>
+```
+

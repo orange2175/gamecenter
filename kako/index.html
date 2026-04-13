@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Rhythm Punch Game</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    #gameWrap {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      background: #000;
+    }
+
+    #hud {
+      width: 100%;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(0,0,0,0.7);
+      font-weight: bold;
+      font-size: 14px;
+      z-index: 5;
+    }
+
+    #gameArea {
+      position: relative;
+      width: 100%;
+      flex: 1;
+      overflow: hidden;
+      background: #222;
+    }
+
+    #bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    #judgeLine {
+      position: absolute;
+      left: 22%;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      background: rgba(255,255,255,0.45);
+      box-shadow: 0 0 10px rgba(255,255,255,0.25);
+      z-index: 2;
+    }
+
+    #laneLabel {
+      position: absolute;
+      left: calc(22% - 14px);
+      top: 16px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+      z-index: 3;
+    }
+
+    #character {
+      position: absolute;
+      left: 9%;
+      bottom: 6%;
+      width: min(24vw, 180px);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      z-index: 4;
+      user-select: none;
+      pointer-events: none;
+      transform: translateZ(0);
+    }
+
+    .note {
+      position: absolute;
+      width: clamp(36px, 6vw, 54px);
+      height: clamp(36px, 6vw, 54px);
+      border-radius: 50%;
+      background: rgba(255, 120, 120, 0.92);
+      border: 3px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 14px rgba(255,100,100,0.55);
+      top: 54%;
+      transform: translate(-50%, -50%);
+      z-index: 3;
+    }
+
+    .note.k-note {
+      background: rgba(110, 180, 255, 0.92);
+      box-shadow: 0 0 14px rgba(110,180,255,0.55);
+    }
+
+    .note.bad-note {
+      background: rgba(180, 120, 255, 0.95);
+      box-shadow: 0 0 14px rgba(180,120,255,0.6);
+    }
+
+    .note.bind-note {
+      background: rgba(170, 170, 170, 0.95);
+      box-shadow: 0 0 14px rgba(200,200,200,0.45);
+    }
+
+    .note.heal-note {
+      background: rgba(255, 105, 145, 0.95);
+      box-shadow: 0 0 14px rgba(255,105,145,0.55);
+    }
+
+    .note::after {
+      content: attr(data-label);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(16px, 3vw, 22px);
+      font-weight: bold;
+      color: #fff;
+    }
+
+    #feedback {
+      position: absolute;
+      left: 50%;
+      top: 14%;
+      transform: translateX(-50%);
+      font-size: clamp(22px, 5vw, 42px);
+      font-weight: bold;
+      text-shadow: 0 0 8px rgba(0,0,0,0.8);
+      z-index: 6;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      pointer-events: none;
+    }
+
+    #controls {
+      width: 100%;
+      padding: 12px 10px 16px;
+      background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.72));
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      z-index: 5;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 16px;
+      height: 64px;
+      font-size: 24px;
+      font-weight: bold;
+      color: white;
+      background: #3b3b3b;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.35);
+    }
+
+    .btn:active { transform: scale(0.96); }
+    #btnP { background: #b63d3d; }
+    #btnK { background: #3d6fb6; }
+    #btnG, #btnS { background: #555; opacity: 0.7; }
+
+    #startOverlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(0,0,0,0.7);
+      z-index: 10;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #startOverlay button {
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 22px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #d24f4f;
+      color: #fff;
+    }
+
+    .small {
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameWrap">
+    <div id="hud">
+      <div>Score: <span id="score">0</span></div>
+      <div>Combo: <span id="combo">0</span></div>
+      <div>Life: <span id="life">10</span></div>
+    </div>
+
+    <div id="gameArea">
+      <img id="bg" src="back.png" alt="background" />
+      <div id="judgeLine"></div>
+      <div id="laneLabel">HIT</div>
+      <img id="character" src="st.png" alt="player" />
+      <div id="feedback"></div>
+
+      <div id="startOverlay">
+        <h1 style="margin:0; font-size:28px;">リズムパンチ</h1>
+        <div class="small">
+          Pはパンチ、Kはキックです。<br>
+          💀 / ⛓ / ♥ はパンチでもキックでも触れます。<br>
+          💀と⛓と♥は流してもミスになりません。
+        </div>
+        <button id="startBtn">スタート</button>
+      </div>
+    </div>
+
+    <div id="controls">
+      <button class="btn" id="btnP">P</button>
+      <button class="btn" id="btnK">K</button>
+      <button class="btn" id="btnG">G</button>
+      <button class="btn" id="btnS">S</button>
+    </div>
+  </div>
+
+  <script>
+    const gameArea = document.getElementById('gameArea');
+    const character = document.getElementById('character');
+    const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
+    const lifeEl = document.getElementById('life');
+    const feedbackEl = document.getElementById('feedback');
+    const startOverlay = document.getElementById('startOverlay');
+    const startBtn = document.getElementById('startBtn');
+    const btnP = document.getElementById('btnP');
+    const btnK = document.getElementById('btnK');
+
+    const idleFrames = ['st.png'];
+    const punchFrames = ['p1.png', 'p2.png', 'p3.png'];
+    const kickFrames = ['k1.png', 'k2.png', 'k3.png'];
+    const poisonFrames = ['poi1.png', 'poi2.png'];
+
+    let idleFrameIndex = 0;
+    let idleTimer = 0;
+    let isActing = false;
+    let notes = [];
+    let gameRunning = false;
+    let score = 0;
+    let combo = 0;
+    let life = 10;
+    let lastTime = 0;
+    let spawnTimer = 0;
+    let nextSpawn = 1.8;
+    let punchStep = 0;
+    let kickStep = 0;
+    let poisonStep = 0;
+    let isBound = false;
+    let boundUntil = 0;
+    let poisonUntil = 0;
+
+    const judgeXRatio = 0.22;
+    const noteSpeed = 240;
+
+    function preloadImages(list) {
+      list.forEach(src => {
+        const img = new Image();
+        img.src = src;
+      });
+    }
+
+    preloadImages([
+      ...idleFrames,
+      ...punchFrames,
+      ...kickFrames,
+      ...poisonFrames,
+      'back.png',
+      'bin-a.png'
+    ]);
+
+    function setFeedback(text, color = '#fff') {
+      feedbackEl.textContent = text;
+      feedbackEl.style.color = color;
+      feedbackEl.style.opacity = '1';
+      clearTimeout(setFeedback.timer);
+      setFeedback.timer = setTimeout(() => {
+        feedbackEl.style.opacity = '0';
+      }, 280);
+    }
+
+    function updateHud() {
+      scoreEl.textContent = score;
+      comboEl.textContent = combo;
+      lifeEl.textContent = life;
+    }
+
+    function createNote() {
+      const roll = Math.random();
+      let type = 'p';
+      if (roll < 0.32) type = 'p';
+      else if (roll < 0.64) type = 'k';
+      else if (roll < 0.76) type = 'bad';
+      else if (roll < 0.88) type = 'bind';
+      else type = 'heal';
+
+      const labelMap = {
+        p: 'P',
+        k: 'K',
+        bad: '💀',
+        bind: '⛓',
+        heal: '♥'
+      };
+
+      const classMap = {
+        p: '',
+        k: 'k-note',
+        bad: 'bad-note',
+        bind: 'bind-note',
+        heal: 'heal-note'
+      };
+
+      const note = document.createElement('div');
+      note.className = `note ${classMap[type]}`.trim();
+      note.dataset.label = labelMap[type];
+      gameArea.appendChild(note);
+
+      const startX = gameArea.clientWidth + 40;
+      const y = gameArea.clientHeight * 0.85;
+
+      const noteObj = {
+        el: note,
+        x: startX,
+        y,
+        hit: false,
+        type,
+      };
+
+      notes.push(noteObj);
+      renderNote(noteObj);
+    }
+
+    function renderNote(noteObj) {
+      noteObj.el.style.left = noteObj.x + 'px';
+      noteObj.el.style.top = noteObj.y + 'px';
+    }
+
+    function updateIdleSprite() {
+      if (isBound) {
+        character.src = 'bin-a.png';
+        return;
+      }
+      if (performance.now() < poisonUntil) {
+        if (!isActing && idleTimer >= 0.18) {
+          idleTimer = 0;
+          playPoisonFrame();
+        }
+        return;
+      }
+      character.src = idleFrames[0];
+    }
+
+    function playPunchFrame() {
+      character.src = punchFrames[punchStep];
+      punchStep = (punchStep + 1) % punchFrames.length;
+      isActing = true;
+      clearTimeout(playPunchFrame.timer);
+      playPunchFrame.timer = setTimeout(() => {
+        isActing = false;
+        updateIdleSprite();
+      }, 120);
+    }
+
+    function playKickFrame() {
+      character.src = kickFrames[kickStep];
+      kickStep = (kickStep + 1) % kickFrames.length;
+      isActing = true;
+      clearTimeout(playKickFrame.timer);
+      playKickFrame.timer = setTimeout(() => {
+        isActing = false;
+        updateIdleSprite();
+      }, 120);
+    }
+
+    function playPoisonFrame() {
+      character.src = poisonFrames[poisonStep];
+      poisonStep = (poisonStep + 1) % poisonFrames.length;
+    }
+
+    function removeNote(noteObj) {
+      if (noteObj.el && noteObj.el.parentNode) {
+        noteObj.el.parentNode.removeChild(noteObj.el);
+      }
+      notes = notes.filter(n => n !== noteObj);
+    }
+
+    function judgeInput(inputType) {
+      const judgeX = gameArea.clientWidth * judgeXRatio;
+      let bestNote = null;
+      let bestDist = Infinity;
+
+      for (const note of notes) {
+        if (note.hit) continue;
+        const dist = Math.abs(note.x - judgeX);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestNote = note;
+        }
+      }
+
+      if (!bestNote) {
+        combo = 0;
+        setFeedback('MISS', '#9ecbff');
+        updateHud();
+        return;
+      }
+
+      const inRange = bestDist <= 68;
+      if (!inRange) {
+        combo = 0;
+        setFeedback('MISS', '#9ecbff');
+        updateHud();
+        return;
+      }
+
+      if (bestNote.type === 'bad') {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        life = Math.max(0, life - 3);
+        combo = 0;
+        poisonUntil = performance.now() + 5000;
+        poisonStep = 0;
+        idleTimer = 0;
+        playPoisonFrame();
+        setFeedback('POISON', '#d38cff');
+        updateHud();
+        if (life <= 0) gameOver();
+        return;
+      }
+
+      if (bestNote.type === 'bind') {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        combo = 0;
+        isBound = true;
+        boundUntil = performance.now() + 3000;
+        character.src = 'bin-a.png';
+        setFeedback('BIND', '#d0d0d0');
+        updateHud();
+        return;
+      }
+
+      if (bestNote.type === 'heal') {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        life = Math.min(10, life + 3);
+        setFeedback('HEAL', '#ff8fb1');
+        updateHud();
+        return;
+      }
+
+      if (bestNote.type !== inputType) {
+        combo = 0;
+        setFeedback('WRONG', '#ff9de1');
+        updateHud();
+        return;
+      }
+
+      if (bestDist <= 22) {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        score += 300;
+        combo += 1;
+        setFeedback('PERFECT', '#ffe16a');
+      } else if (bestDist <= 42) {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        score += 150;
+        combo += 1;
+        setFeedback('GOOD', '#7dffb3');
+      } else {
+        bestNote.hit = true;
+        removeNote(bestNote);
+        score += 50;
+        combo = 0;
+        setFeedback('BAD', '#ffb36b');
+      }
+
+      updateHud();
+    }
+
+    function punch() {
+      if (!gameRunning || isBound) return;
+      playPunchFrame();
+      judgeInput('p');
+    }
+
+    function kick() {
+      if (!gameRunning || isBound) return;
+      playKickFrame();
+      judgeInput('k');
+    }
+
+    function updateIdle(dt) {
+      idleTimer += dt;
+
+      if (isBound) {
+        character.src = 'bin-a.png';
+        return;
+      }
+
+      if (performance.now() < poisonUntil) {
+        if (!isActing && idleTimer >= 0.18) {
+          idleTimer = 0;
+          poisonStep = (poisonStep + 1) % poisonFrames.length;
+          playPoisonFrame();
+        }
+        return;
+      }
+
+      if (isActing) return;
+      if (idleTimer >= 0.16) {
+        idleTimer = 0;
+        idleFrameIndex = 0;
+        character.src = idleFrames[idleFrameIndex];
+      }
+    }
+
+    function updateNotes(dt) {
+      const judgeLeftLimit = gameArea.clientWidth * judgeXRatio - 75;
+      const now = performance.now();
+
+      if (isBound && now >= boundUntil) {
+        isBound = false;
+        updateIdleSprite();
+      }
+
+      for (let i = notes.length - 1; i >= 0; i--) {
+        const note = notes[i];
+        note.x -= noteSpeed * dt;
+        renderNote(note);
+
+        if (note.x < judgeLeftLimit && !note.hit) {
+          combo = 0;
+          const safeNote = note.type === 'bad' || note.type === 'bind' || note.type === 'heal';
+          if (!safeNote) {
+            life -= 1;
+            setFeedback('MISS', '#9ecbff');
+            updateHud();
+          }
+          removeNote(note);
+
+          if (life <= 0) {
+            gameOver();
+            return;
+          }
+        }
+      }
+    }
+
+    function updateSpawn(dt) {
+      spawnTimer += dt;
+      if (spawnTimer >= nextSpawn) {
+        spawnTimer = 0;
+        createNote();
+        nextSpawn = 1.05 + Math.random() * 0.55;
+      }
+    }
+
+    function gameLoop(timestamp) {
+      if (!gameRunning) return;
+
+      if (!lastTime) lastTime = timestamp;
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.033);
+      lastTime = timestamp;
+
+      updateIdle(dt);
+      updateNotes(dt);
+      updateSpawn(dt);
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function resetGame() {
+      notes.forEach(note => note.el.remove());
+      notes = [];
+      score = 0;
+      combo = 0;
+      life = 10;
+      idleFrameIndex = 0;
+      idleTimer = 0;
+      spawnTimer = 0;
+      nextSpawn = 1.8;
+      isActing = false;
+      punchStep = 0;
+      kickStep = 0;
+      poisonStep = 0;
+      isBound = false;
+      boundUntil = 0;
+      poisonUntil = 0;
+      character.src = idleFrames[0];
+      updateHud();
+      feedbackEl.style.opacity = '0';
+    }
+
+    function startGame() {
+      resetGame();
+      gameRunning = true;
+      lastTime = 0;
+      startOverlay.style.display = 'none';
+      requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+      gameRunning = false;
+      setFeedback('GAME OVER', '#ff8c8c');
+      startOverlay.style.display = 'flex';
+      startOverlay.innerHTML = `
+        <h1 style="margin:0; font-size:28px;">ゲームオーバー</h1>
+        <div class="small">
+          Score: ${score}<br>
+          もう一度遊べます。
+        </div>
+        <button id="restartBtn">リトライ</button>
+      `;
+      document.getElementById('restartBtn').addEventListener('click', startGame, { once: true });
+    }
+
+    btnP.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      punch();
+    });
+
+    btnK.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      kick();
+    });
+
+    startBtn.addEventListener('click', startGame);
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'p') punch();
+      if (key === 'k') kick();
+    });
+
+    window.addEventListener('resize', () => {
+      notes.forEach(renderNote);
+    });
+  </script>
+</body>
+</html>

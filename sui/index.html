@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
+  <title>2D Belt Action</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="hud">
+    <span id="msg">loading...</span>
+  </div>
+
+  <div class="controls">
+    <button id="left" type="button">←</button>
+    <button id="punch" type="button">P</button>
+    <button id="kick" type="button">K</button>
+    <button id="jump" type="button">J</button>
+    <button id="right" type="button">→</button>
+  </div>
+
+  <script src="game-entities.js"></script>
+  <script src="game-render.js"></script>
+  <script src="game-core.js"></script>
+</body>
+</html>
