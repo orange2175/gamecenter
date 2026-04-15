@@ -2,668 +2,877 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
   <title>Rhythm Punch Game</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --col-p: #ff4e4e;
+      --col-k: #4e9eff;
+      --col-bad: #b04eff;
+      --col-bind: #aaaaaa;
+      --col-heal: #ff6e9e;
+      --col-rapid: #ffcc00;
+      --col-fast: #00ffcc;
+      --col-fake: #ff8c42;
+      --col-perfect: #ffe16a;
+      --col-good: #7dffb3;
+      --col-bad-fb: #ffb36b;
+      --col-miss: #9ecbff;
+      --glow: 0 0 18px rgba(255,255,255,0.18);
+    }
     html, body {
-  height: 100%;
-      margin: 0;
-      padding: 0;
-      background: #111;
-      color: #fff;
-      font-family: sans-serif;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
       overflow: hidden;
+      background: #000;
+      color: #fff;
+      font-family: 'Noto Sans JP', sans-serif;
       touch-action: manipulation;
     }
+    body { position: fixed; inset: 0; }
 
     #gameWrap {
-   width: 100vw;
-  height: 100dvh;
-  min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      background: #000;
+      position: fixed; inset: 0;
+      width: 100vw; height: 100dvh;
+      background: #000; overflow: hidden;
     }
 
+    /* ── HUD ── */
     #hud {
-      width: 100%;
-      padding: 10px 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(0,0,0,0.7);
-      font-weight: bold;
-      font-size: 14px;
-      z-index: 5;
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 56px; padding: 0 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.92), transparent);
+      z-index: 20;
+    }
+    .hud-block { display: flex; flex-direction: column; align-items: center; }
+    .hud-label { font-size: 9px; letter-spacing: 2px; opacity: 0.55; text-transform: uppercase; }
+    .hud-val { font-size: 18px; font-weight: 900; line-height: 1; font-family: 'Black Han Sans', sans-serif; }
+    #comboVal { font-size: 22px; color: var(--col-perfect); text-shadow: 0 0 10px rgba(255,225,106,0.6); }
+    #waveIndicator {
+      position: absolute; top: 56px; left: 0; right: 0;
+      text-align: center; font-size: 11px; letter-spacing: 3px;
+      color: rgba(255,255,255,0.5); z-index: 20;
     }
 
+    /* ── Game Area ── */
     #gameArea {
-      position: relative;
-      width: 100%;
-      flex: 1;
-      overflow: hidden;
-      background: #222;
+      position: absolute; left: 0; right: 0;
+      top: 56px; bottom: calc(84px + env(safe-area-inset-bottom));
+      overflow: hidden; background: #1a1a2e;
+    }
+    #bg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; pointer-events: none; user-select: none;
+      opacity: 0.7;
     }
 
-    #bg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      pointer-events: none;
-      user-select: none;
+    /* scanlines overlay */
+    #gameArea::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px
+      );
+      pointer-events: none; z-index: 1;
     }
 
     #judgeLine {
-      position: absolute;
-      left: 22%;
-      top: 0;
-      width: 5px;
-      height: 100%;
-      background: rgba(255,255,255,0.45);
-      box-shadow: 0 0 10px rgba(255,255,255,0.25);
+      position: absolute; left: 22%; top: 0;
+      width: 3px; height: 100%;
+      background: rgba(255,255,255,0.55);
+      box-shadow: 0 0 14px rgba(255,255,255,0.4), 0 0 30px rgba(255,255,255,0.15);
       z-index: 2;
     }
-
+    #judgeGlow {
+      position: absolute; left: calc(22% - 18px); top: 0;
+      width: 40px; height: 100%;
+      background: linear-gradient(to right, transparent, rgba(255,255,255,0.06), transparent);
+      z-index: 2; pointer-events: none;
+    }
     #laneLabel {
-      position: absolute;
-      left: calc(22% - 14px);
-      top: 16px;
-      font-size: 12px;
-      color: rgba(255,255,255,0.8);
-      z-index: 3;
+      position: absolute; left: calc(22% - 16px); top: 12px;
+      font-size: 10px; letter-spacing: 2px;
+      color: rgba(255,255,255,0.7); z-index: 3;
     }
 
     #character {
-      position: absolute;
-      left: 9%;
-      bottom: 6%;
+      position: absolute; left: 9%; bottom: 6%;
       width: min(24vw, 180px);
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      z-index: 4;
-      user-select: none;
-      pointer-events: none;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+      z-index: 4; user-select: none; pointer-events: none;
       transform: translateZ(0);
     }
 
+    /* ── Notes ── */
     .note {
       position: absolute;
-      width: clamp(36px, 6vw, 54px);
-      height: clamp(36px, 6vw, 54px);
+      width: clamp(36px, 6vw, 52px); height: clamp(36px, 6vw, 52px);
       border-radius: 50%;
-      background: rgba(255, 120, 120, 0.92);
-      border: 3px solid rgba(255,255,255,0.9);
+      background: rgba(255,120,120,0.92);
+      border: 3px solid rgba(255,255,255,0.85);
       box-shadow: 0 0 14px rgba(255,100,100,0.55);
-      top: 54%;
       transform: translate(-50%, -50%);
       z-index: 3;
+      transition: box-shadow 0.05s;
     }
+    .note.k-note    { background: rgba(78,158,255,0.92); box-shadow: 0 0 14px rgba(78,158,255,0.55); }
+    .note.bad-note  { background: rgba(176,78,255,0.95); box-shadow: 0 0 14px rgba(176,78,255,0.6); }
+    .note.bind-note { background: rgba(170,170,170,0.95); box-shadow: 0 0 14px rgba(200,200,200,0.45); }
+    .note.heal-note { background: rgba(255,110,158,0.95); box-shadow: 0 0 14px rgba(255,110,158,0.55); }
+    .note.rapid-note { background: rgba(255,204,0,0.95); box-shadow: 0 0 14px rgba(255,204,0,0.6); animation: rapidPulse 0.3s infinite alternate; }
+    .note.fast-note { background: rgba(0,255,204,0.95); box-shadow: 0 0 14px rgba(0,255,204,0.6); }
+    .note.fake-note { background: rgba(255,140,66,0.95); box-shadow: 0 0 14px rgba(255,140,66,0.6); }
 
-    .note.k-note {
-      background: rgba(110, 180, 255, 0.92);
-      box-shadow: 0 0 14px rgba(110,180,255,0.55);
-    }
-
-    .note.bad-note {
-      background: rgba(180, 120, 255, 0.95);
-      box-shadow: 0 0 14px rgba(180,120,255,0.6);
-    }
-
-    .note.bind-note {
-      background: rgba(170, 170, 170, 0.95);
-      box-shadow: 0 0 14px rgba(200,200,200,0.45);
-    }
-
-    .note.heal-note {
-      background: rgba(255, 105, 145, 0.95);
-      box-shadow: 0 0 14px rgba(255,105,145,0.55);
-    }
+    @keyframes rapidPulse { from { transform: translate(-50%,-50%) scale(1); } to { transform: translate(-50%,-50%) scale(1.1); } }
 
     .note::after {
       content: attr(data-label);
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(16px, 3vw, 22px);
-      font-weight: bold;
-      color: #fff;
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: clamp(14px, 2.8vw, 20px); font-weight: bold; color: #fff;
     }
 
+    /* rapid hit counter badge */
+    .rapid-count {
+      position: absolute;
+      top: -12px; right: -8px;
+      background: #fff; color: #222;
+      font-size: 11px; font-weight: 900;
+      border-radius: 999px; padding: 1px 5px;
+      line-height: 1.3; pointer-events: none;
+    }
+
+    /* ── Feedback ── */
     #feedback {
-      position: absolute;
-      left: 50%;
-      top: 14%;
+      position: absolute; left: 50%; top: 12%;
       transform: translateX(-50%);
-      font-size: clamp(22px, 5vw, 42px);
-      font-weight: bold;
-      text-shadow: 0 0 8px rgba(0,0,0,0.8);
-      z-index: 6;
-      opacity: 0;
-      transition: opacity 0.12s ease;
+      font-size: clamp(24px, 5.5vw, 46px); font-weight: 900;
+      font-family: 'Black Han Sans', sans-serif;
+      text-shadow: 0 0 10px rgba(0,0,0,0.8);
+      z-index: 6; opacity: 0;
+      transition: opacity 0.1s ease;
       pointer-events: none;
+      white-space: nowrap;
     }
 
+    /* combo multiplier display */
+    #comboMult {
+      position: absolute; left: 50%; top: 22%;
+      transform: translateX(-50%);
+      font-size: clamp(14px, 3vw, 22px); font-weight: 700;
+      color: var(--col-perfect); opacity: 0;
+      pointer-events: none; z-index: 6;
+      transition: opacity 0.15s;
+    }
+
+    /* ── Hit particles canvas ── */
+    #fxCanvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 5;
+    }
+
+    /* ── Screen shake ── */
+    @keyframes shake {
+      0%,100% { transform: translate(0,0); }
+      20% { transform: translate(-4px, 2px); }
+      40% { transform: translate(4px, -2px); }
+      60% { transform: translate(-3px, 3px); }
+      80% { transform: translate(3px, -1px); }
+    }
+    .shaking { animation: shake 0.22s ease; }
+
+    /* ── Judge line flash ── */
+    @keyframes judgeFlash {
+      0% { opacity: 1; box-shadow: 0 0 30px rgba(255,255,255,0.9); }
+      100% { opacity: 1; box-shadow: 0 0 14px rgba(255,255,255,0.4); }
+    }
+    .judge-flash { animation: judgeFlash 0.18s ease-out; }
+
+    /* ── Controls ── */
     #controls {
-      width: 100%;
-      padding: 12px 10px 16px;
-      background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.72));
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      z-index: 5;
+      position: absolute; left: 0; right: 0; bottom: 0;
+      height: calc(84px + env(safe-area-inset-bottom));
+      padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(0,0,0,0.97), rgba(0,0,0,0.72));
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      z-index: 30;
     }
-
     .btn {
-      appearance: none;
-      border: 0;
-      border-radius: 16px;
-      height: 64px;
-      font-size: 24px;
-      font-weight: bold;
-      color: white;
-      background: #3b3b3b;
-      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.35);
+      appearance: none; border: 0; border-radius: 14px;
+      height: 56px; font-size: 22px; font-weight: bold;
+      color: white; background: #3b3b3b;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,0.4), 0 0 0 2px rgba(255,255,255,0.07);
+      transition: transform 0.06s, box-shadow 0.06s;
     }
+    .btn:active { transform: scale(0.95); box-shadow: inset 0 -1px 0 rgba(0,0,0,0.4); }
+    #btnP { background: linear-gradient(135deg, #c43a3a, #8b1a1a); border-top: 2px solid rgba(255,100,100,0.4); }
+    #btnK { background: linear-gradient(135deg, #2d5fa8, #1a3572); border-top: 2px solid rgba(78,158,255,0.4); }
+    #btnG, #btnS { background: #383838; opacity: 0.6; }
 
-    .btn:active { transform: scale(0.96); }
-    #btnP { background: #b63d3d; }
-    #btnK { background: #3d6fb6; }
-    #btnG, #btnS { background: #555; opacity: 0.7; }
-
+    /* ── Overlays ── */
     #startOverlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      background: rgba(0,0,0,0.7);
-      z-index: 10;
-      text-align: center;
-      padding: 20px;
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px;
+      background: rgba(0,0,0,0.82);
+      z-index: 40;
+      text-align: center; padding: 24px;
+      backdrop-filter: blur(3px);
     }
-
-    #startOverlay button {
-      border: 0;
-      border-radius: 14px;
-      padding: 14px 22px;
-      font-size: 18px;
-      font-weight: bold;
-      background: #d24f4f;
-      color: #fff;
+    #startOverlay h1 {
+      margin: 0; font-size: 32px;
+      font-family: 'Black Han Sans', sans-serif;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 12px rgba(255,100,100,0.4));
     }
+    .small { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.7; }
+    .overlay-btn {
+      border: 0; border-radius: 14px;
+      padding: 14px 28px; font-size: 18px; font-weight: 900;
+      background: linear-gradient(135deg, #d24f4f, #8b1515);
+      color: #fff; letter-spacing: 2px;
+      box-shadow: 0 4px 20px rgba(210,79,79,0.5);
+      font-family: 'Black Han Sans', sans-serif;
+    }
+    .overlay-btn:active { transform: scale(0.97); }
 
-    .small {
-      font-size: 13px;
-      color: rgba(255,255,255,0.85);
-      line-height: 1.6;
+    /* Ranking table */
+    #rankingTable {
+      width: 100%; max-width: 280px;
+      border-collapse: collapse; font-size: 13px;
+    }
+    #rankingTable th {
+      padding: 4px 8px; font-size: 10px;
+      letter-spacing: 2px; opacity: 0.5; text-transform: uppercase;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+    #rankingTable td {
+      padding: 5px 8px; text-align: center;
+    }
+    #rankingTable tr:first-child td { color: #ffd700; font-weight: 700; }
+    #rankingTable tr:nth-child(2) td { color: #c0c0c0; }
+    #rankingTable tr:nth-child(3) td { color: #cd7f32; }
+
+    /* Wave flash */
+    #waveBanner {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 7; pointer-events: none;
+      opacity: 0;
+    }
+    #waveBanner span {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: clamp(32px, 8vw, 60px);
+      letter-spacing: 6px;
+      background: linear-gradient(135deg, #ffd93d, #ff6b6b);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 16px rgba(255,200,80,0.7));
+    }
+    @keyframes waveFade {
+      0%   { opacity: 0; transform: scale(0.7); }
+      20%  { opacity: 1; transform: scale(1.05); }
+      70%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.95); }
+    }
+    .wave-show { animation: waveFade 1.4s ease forwards; }
+
+    /* Life bar */
+    #lifebar {
+      width: 80px; height: 6px;
+      background: rgba(255,255,255,0.15); border-radius: 3px;
+      margin-top: 4px; overflow: hidden;
+    }
+    #lifefill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(to right, #ff4e4e, #ff9e4e);
+      transition: width 0.2s ease;
     }
   </style>
 </head>
 <body>
-  <div id="gameWrap">
-    <div id="hud">
-      <div>Score: <span id="score">0</span></div>
-      <div>Combo: <span id="combo">0</span></div>
-      <div>Life: <span id="life">10</span></div>
+<div id="gameWrap">
+  <div id="hud">
+    <div class="hud-block">
+      <span class="hud-label">SCORE</span>
+      <span class="hud-val" id="scoreVal">0</span>
     </div>
+    <div class="hud-block">
+      <span class="hud-label">COMBO</span>
+      <span class="hud-val" id="comboVal">0</span>
+    </div>
+    <div class="hud-block" style="align-items:flex-end">
+      <span class="hud-label">LIFE</span>
+      <div id="lifebar"><div id="lifefill" style="width:100%"></div></div>
+    </div>
+  </div>
+  <div id="waveIndicator">WAVE 1</div>
 
-    <div id="gameArea">
-      <img id="bg" src="back.png" alt="background" />
-      <div id="judgeLine"></div>
-      <div id="laneLabel">HIT</div>
-      <img id="character" src="st.png" alt="player" />
-      <div id="feedback"></div>
+  <div id="gameArea">
+    <img id="bg" src="back.png" alt="" />
+    <div id="judgeLine"></div>
+    <div id="judgeGlow"></div>
+    <div id="laneLabel">HIT</div>
+    <img id="character" src="st.png" alt="player" />
+    <div id="feedback"></div>
+    <div id="comboMult"></div>
+    <div id="waveBanner"><span></span></div>
+    <canvas id="fxCanvas"></canvas>
 
-      <div id="startOverlay">
-        <h1 style="margin:0; font-size:28px;">リズムパンチ</h1>
-        <div class="small">
-          Pはパンチ、Kはキックです。<br>
-          💀 / ⛓ / ♥ はパンチでもキックでも触れます。<br>
-          💀と⛓と♥は流してもミスになりません。
-        </div>
-        <button id="startBtn">スタート</button>
+    <div id="startOverlay">
+      <h1>リズムパンチ</h1>
+      <div class="small">
+        <b>P</b> = パンチノート &nbsp; <b>K</b> = キックノート<br>
+        💀ポイズン / ⛓バインド / ♥ヒール はP・K両方で取れる<br>
+        ⚡連打ノートは素早く連打！&nbsp; 💨高速ノートはシビア！<br>
+        ❓フェイクは取っちゃダメ！<br><br>
+        ウェーブが進むほどノートが速くなるよ
       </div>
-    </div>
-
-    <div id="controls">
-      <button class="btn" id="btnP">P</button>
-      <button class="btn" id="btnK">K</button>
-      <button class="btn" id="btnG">G</button>
-      <button class="btn" id="btnS">S</button>
+      <button class="overlay-btn" id="startBtn">スタート</button>
+      <div id="rankSection"></div>
     </div>
   </div>
 
-  <script>
-    const gameArea = document.getElementById('gameArea');
-    const character = document.getElementById('character');
-    const scoreEl = document.getElementById('score');
-    const comboEl = document.getElementById('combo');
-    const lifeEl = document.getElementById('life');
-    const feedbackEl = document.getElementById('feedback');
-    const startOverlay = document.getElementById('startOverlay');
-    const startBtn = document.getElementById('startBtn');
-    const btnP = document.getElementById('btnP');
-    const btnK = document.getElementById('btnK');
+  <div id="controls">
+    <button class="btn" id="btnP">P</button>
+    <button class="btn" id="btnK">K</button>
+    <button class="btn" id="btnG">G</button>
+    <button class="btn" id="btnS">S</button>
+  </div>
+</div>
 
-    const idleFrames = ['st.png'];
-    const punchFrames = ['p1.png', 'p2.png', 'p3.png'];
-    const kickFrames = ['k1.png', 'k2.png', 'k3.png'];
-    const poisonFrames = ['poi1.png', 'poi2.png'];
+<script>
+// ── Elements ──
+const gameArea   = document.getElementById('gameArea');
+const character  = document.getElementById('character');
+const scoreEl    = document.getElementById('scoreVal');
+const comboEl    = document.getElementById('comboVal');
+const lifeEl     = document.getElementById('lifefill');
+const feedbackEl = document.getElementById('feedback');
+const comboMultEl= document.getElementById('comboMult');
+const startOverlay = document.getElementById('startOverlay');
+const startBtn   = document.getElementById('startBtn');
+const btnP       = document.getElementById('btnP');
+const btnK       = document.getElementById('btnK');
+const waveIndEl  = document.getElementById('waveIndicator');
+const waveBanner = document.getElementById('waveBanner');
+const waveBannerSpan = waveBanner.querySelector('span');
+const fxCanvas   = document.getElementById('fxCanvas');
+const fxCtx      = fxCanvas.getContext('2d');
+const rankSection= document.getElementById('rankSection');
+const judgeLine  = document.getElementById('judgeLine');
 
-    let idleFrameIndex = 0;
-    let idleTimer = 0;
-    let isActing = false;
-    let notes = [];
-    let gameRunning = false;
-    let score = 0;
-    let combo = 0;
-    let life = 10;
-    let lastTime = 0;
-    let spawnTimer = 0;
-    let nextSpawn = 1.8;
-    let punchStep = 0;
-    let kickStep = 0;
-    let poisonStep = 0;
-    let isBound = false;
-    let boundUntil = 0;
-    let poisonUntil = 0;
+// ── Sprites ──
+const idleFrames  = ['st.png'];
+const punchFrames = ['p1.png','p2.png','p3.png'];
+const kickFrames  = ['k1.png','k2.png','k3.png'];
+const poisonFrames= ['poi1.png','poi2.png'];
 
-    const judgeXRatio = 0.22;
-    const noteSpeed = 240;
+// ── State ──
+let notes=[], particles=[], gameRunning=false;
+let score=0, combo=0, life=10, maxLife=10;
+let lastTime=0, spawnTimer=0, nextSpawn=1.8;
+let idleFrameIndex=0, idleTimer=0, isActing=false;
+let punchStep=0, kickStep=0, poisonStep=0;
+let isBound=false, boundUntil=0, poisonUntil=0;
+let wave=1, waveTimer=0, waveDuration=20;
+let noteSpeed=240, spawnMin=1.05, spawnRand=0.55;
+let comboFlashTimer=0;
 
-    function preloadImages(list) {
-      list.forEach(src => {
-        const img = new Image();
-        img.src = src;
-      });
-    }
+const judgeXRatio = 0.22;
+const LIFE_MAX = 10;
 
-    preloadImages([
-      ...idleFrames,
-      ...punchFrames,
-      ...kickFrames,
-      ...poisonFrames,
-      'back.png',
-      'bin-a.png'
-    ]);
+// ── Preload ──
+[...idleFrames,...punchFrames,...kickFrames,...poisonFrames,'back.png','bin-a.png']
+  .forEach(s=>{ const i=new Image(); i.src=s; });
 
-    function setFeedback(text, color = '#fff') {
-      feedbackEl.textContent = text;
-      feedbackEl.style.color = color;
-      feedbackEl.style.opacity = '1';
-      clearTimeout(setFeedback.timer);
-      setFeedback.timer = setTimeout(() => {
-        feedbackEl.style.opacity = '0';
-      }, 280);
-    }
+// ── Canvas resize ──
+function resizeCanvas() {
+  fxCanvas.width  = gameArea.clientWidth;
+  fxCanvas.height = gameArea.clientHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
 
-    function updateHud() {
-      scoreEl.textContent = score;
-      comboEl.textContent = combo;
-      lifeEl.textContent = life;
-    }
+// ── Local ranking ──
+const RANK_KEY = 'rp_rankings';
+function getRankings() {
+  try { return JSON.parse(localStorage.getItem(RANK_KEY)) || []; } catch { return []; }
+}
+function saveRanking(s) {
+  const r = getRankings();
+  r.push(s);
+  r.sort((a,b)=>b-a);
+  r.splice(5);
+  localStorage.setItem(RANK_KEY, JSON.stringify(r));
+}
+function renderRankings(highlight) {
+  const r = getRankings();
+  if (!r.length) { rankSection.innerHTML=''; return; }
+  const medals = ['🥇','🥈','🥉','4','5'];
+  let rows = r.map((v,i)=>`<tr><td>${medals[i]}</td><td>${v.toLocaleString()}</td></tr>`).join('');
+  rankSection.innerHTML = `
+    <div style="margin-top:12px;font-size:11px;letter-spacing:2px;opacity:.5;">RANKING</div>
+    <table id="rankingTable"><thead><tr><th>RANK</th><th>SCORE</th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
 
-    function createNote() {
-      const roll = Math.random();
-      let type = 'p';
-      if (roll < 0.32) type = 'p';
-      else if (roll < 0.64) type = 'k';
-      else if (roll < 0.76) type = 'bad';
-      else if (roll < 0.88) type = 'bind';
-      else type = 'heal';
+// ── Feedback ──
+let fbTimer;
+function setFeedback(text, color='#fff') {
+  feedbackEl.textContent = text;
+  feedbackEl.style.color = color;
+  feedbackEl.style.opacity = '1';
+  feedbackEl.style.transform = 'translateX(-50%) scale(1.15)';
+  clearTimeout(fbTimer);
+  feedbackEl.style.transition = 'opacity 0.08s, transform 0.08s';
+  requestAnimationFrame(()=>{
+    feedbackEl.style.transform = 'translateX(-50%) scale(1)';
+  });
+  fbTimer = setTimeout(()=>{ feedbackEl.style.opacity='0'; }, 280);
+}
 
-      const labelMap = {
-        p: 'P',
-        k: 'K',
-        bad: '💀',
-        bind: '⛓',
-        heal: '♥'
-      };
+// ── Combo multiplier display ──
+let cmTimer;
+function showComboMult(c) {
+  if (c < 5) { comboMultEl.style.opacity='0'; return; }
+  const mult = c>=30?'×4':c>=20?'×3':c>=10?'×2':'×1.5';
+  comboMultEl.textContent = `COMBO ${mult}`;
+  comboMultEl.style.opacity='1';
+  clearTimeout(cmTimer);
+  cmTimer = setTimeout(()=>{ comboMultEl.style.opacity='0'; }, 700);
+}
 
-      const classMap = {
-        p: '',
-        k: 'k-note',
-        bad: 'bad-note',
-        bind: 'bind-note',
-        heal: 'heal-note'
-      };
+// ── Score with combo multiplier ──
+function addScore(base) {
+  const mult = combo>=30?4:combo>=20?3:combo>=10?2:combo>=5?1.5:1;
+  const gained = Math.floor(base * mult);
+  score += gained;
+  return gained;
+}
 
-      const note = document.createElement('div');
-      note.className = `note ${classMap[type]}`.trim();
-      note.dataset.label = labelMap[type];
-      gameArea.appendChild(note);
+// ── HUD update ──
+function updateHud() {
+  scoreEl.textContent = score.toLocaleString();
+  comboEl.textContent = combo;
+  const pct = (life/LIFE_MAX)*100;
+  lifeEl.style.width = pct+'%';
+  lifeEl.style.background = pct>50
+    ? 'linear-gradient(to right,#4eff8e,#4edfff)'
+    : pct>25
+    ? 'linear-gradient(to right,#ffd93d,#ff8c4e)'
+    : 'linear-gradient(to right,#ff4e4e,#ff2020)';
+}
 
-      const startX = gameArea.clientWidth + 40;
-      const y = gameArea.clientHeight * 0.85;
+// ── Screen shake ──
+function screenShake() {
+  gameArea.classList.remove('shaking');
+  void gameArea.offsetWidth;
+  gameArea.classList.add('shaking');
+}
 
-      const noteObj = {
-        el: note,
-        x: startX,
-        y,
-        hit: false,
-        type,
-      };
+// ── Judge line flash ──
+function judgeFlash() {
+  judgeLine.classList.remove('judge-flash');
+  void judgeLine.offsetWidth;
+  judgeLine.classList.add('judge-flash');
+}
 
-      notes.push(noteObj);
-      renderNote(noteObj);
-    }
+// ── Wave banner ──
+function showWaveBanner(w) {
+  waveBannerSpan.textContent = w===1?'START!': `WAVE ${w}`;
+  waveBanner.classList.remove('wave-show');
+  void waveBanner.offsetWidth;
+  waveBanner.classList.add('wave-show');
+}
 
-    function renderNote(noteObj) {
-      noteObj.el.style.left = noteObj.x + 'px';
-      noteObj.el.style.top = noteObj.y + 'px';
-    }
-
-    function updateIdleSprite() {
-      if (isBound) {
-        character.src = 'bin-a.png';
-        return;
-      }
-      if (performance.now() < poisonUntil) {
-        if (!isActing && idleTimer >= 0.18) {
-          idleTimer = 0;
-          playPoisonFrame();
-        }
-        return;
-      }
-      character.src = idleFrames[0];
-    }
-
-    function playPunchFrame() {
-      character.src = punchFrames[punchStep];
-      punchStep = (punchStep + 1) % punchFrames.length;
-      isActing = true;
-      clearTimeout(playPunchFrame.timer);
-      playPunchFrame.timer = setTimeout(() => {
-        isActing = false;
-        updateIdleSprite();
-      }, 120);
-    }
-
-    function playKickFrame() {
-      character.src = kickFrames[kickStep];
-      kickStep = (kickStep + 1) % kickFrames.length;
-      isActing = true;
-      clearTimeout(playKickFrame.timer);
-      playKickFrame.timer = setTimeout(() => {
-        isActing = false;
-        updateIdleSprite();
-      }, 120);
-    }
-
-    function playPoisonFrame() {
-      character.src = poisonFrames[poisonStep];
-      poisonStep = (poisonStep + 1) % poisonFrames.length;
-    }
-
-    function removeNote(noteObj) {
-      if (noteObj.el && noteObj.el.parentNode) {
-        noteObj.el.parentNode.removeChild(noteObj.el);
-      }
-      notes = notes.filter(n => n !== noteObj);
-    }
-
-    function judgeInput(inputType) {
-      const judgeX = gameArea.clientWidth * judgeXRatio;
-      let bestNote = null;
-      let bestDist = Infinity;
-
-      for (const note of notes) {
-        if (note.hit) continue;
-        const dist = Math.abs(note.x - judgeX);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestNote = note;
-        }
-      }
-
-      if (!bestNote) {
-        combo = 0;
-        setFeedback('MISS', '#9ecbff');
-        updateHud();
-        return;
-      }
-
-      const inRange = bestDist <= 68;
-      if (!inRange) {
-        combo = 0;
-        setFeedback('MISS', '#9ecbff');
-        updateHud();
-        return;
-      }
-
-      if (bestNote.type === 'bad') {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        life = Math.max(0, life - 3);
-        combo = 0;
-        poisonUntil = performance.now() + 5000;
-        poisonStep = 0;
-        idleTimer = 0;
-        playPoisonFrame();
-        setFeedback('POISON', '#d38cff');
-        updateHud();
-        if (life <= 0) gameOver();
-        return;
-      }
-
-      if (bestNote.type === 'bind') {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        combo = 0;
-        isBound = true;
-        boundUntil = performance.now() + 3000;
-        character.src = 'bin-a.png';
-        setFeedback('BIND', '#d0d0d0');
-        updateHud();
-        return;
-      }
-
-      if (bestNote.type === 'heal') {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        life = Math.min(10, life + 3);
-        setFeedback('HEAL', '#ff8fb1');
-        updateHud();
-        return;
-      }
-
-      if (bestNote.type !== inputType) {
-        combo = 0;
-        setFeedback('WRONG', '#ff9de1');
-        updateHud();
-        return;
-      }
-
-      if (bestDist <= 22) {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        score += 300;
-        combo += 1;
-        setFeedback('PERFECT', '#ffe16a');
-      } else if (bestDist <= 42) {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        score += 150;
-        combo += 1;
-        setFeedback('GOOD', '#7dffb3');
-      } else {
-        bestNote.hit = true;
-        removeNote(bestNote);
-        score += 50;
-        combo = 0;
-        setFeedback('BAD', '#ffb36b');
-      }
-
-      updateHud();
-    }
-
-    function punch() {
-      if (!gameRunning || isBound) return;
-      playPunchFrame();
-      judgeInput('p');
-    }
-
-    function kick() {
-      if (!gameRunning || isBound) return;
-      playKickFrame();
-      judgeInput('k');
-    }
-
-    function updateIdle(dt) {
-      idleTimer += dt;
-
-      if (isBound) {
-        character.src = 'bin-a.png';
-        return;
-      }
-
-      if (performance.now() < poisonUntil) {
-        if (!isActing && idleTimer >= 0.18) {
-          idleTimer = 0;
-          poisonStep = (poisonStep + 1) % poisonFrames.length;
-          playPoisonFrame();
-        }
-        return;
-      }
-
-      if (isActing) return;
-      if (idleTimer >= 0.16) {
-        idleTimer = 0;
-        idleFrameIndex = 0;
-        character.src = idleFrames[idleFrameIndex];
-      }
-    }
-
-    function updateNotes(dt) {
-      const judgeLeftLimit = gameArea.clientWidth * judgeXRatio - 75;
-      const now = performance.now();
-
-      if (isBound && now >= boundUntil) {
-        isBound = false;
-        updateIdleSprite();
-      }
-
-      for (let i = notes.length - 1; i >= 0; i--) {
-        const note = notes[i];
-        note.x -= noteSpeed * dt;
-        renderNote(note);
-
-        if (note.x < judgeLeftLimit && !note.hit) {
-          combo = 0;
-          const safeNote = note.type === 'bad' || note.type === 'bind' || note.type === 'heal';
-          if (!safeNote) {
-            life -= 1;
-            setFeedback('MISS', '#9ecbff');
-            updateHud();
-          }
-          removeNote(note);
-
-          if (life <= 0) {
-            gameOver();
-            return;
-          }
-        }
-      }
-    }
-
-    function updateSpawn(dt) {
-      spawnTimer += dt;
-      if (spawnTimer >= nextSpawn) {
-        spawnTimer = 0;
-        createNote();
-        nextSpawn = 1.05 + Math.random() * 0.55;
-      }
-    }
-
-    function gameLoop(timestamp) {
-      if (!gameRunning) return;
-
-      if (!lastTime) lastTime = timestamp;
-      const dt = Math.min((timestamp - lastTime) / 1000, 0.033);
-      lastTime = timestamp;
-
-      updateIdle(dt);
-      updateNotes(dt);
-      updateSpawn(dt);
-
-      requestAnimationFrame(gameLoop);
-    }
-
-    function resetGame() {
-      notes.forEach(note => note.el.remove());
-      notes = [];
-      score = 0;
-      combo = 0;
-      life = 10;
-      idleFrameIndex = 0;
-      idleTimer = 0;
-      spawnTimer = 0;
-      nextSpawn = 1.8;
-      isActing = false;
-      punchStep = 0;
-      kickStep = 0;
-      poisonStep = 0;
-      isBound = false;
-      boundUntil = 0;
-      poisonUntil = 0;
-      character.src = idleFrames[0];
-      updateHud();
-      feedbackEl.style.opacity = '0';
-    }
-
-    function startGame() {
-      resetGame();
-      gameRunning = true;
-      lastTime = 0;
-      startOverlay.style.display = 'none';
-      requestAnimationFrame(gameLoop);
-    }
-
-    function gameOver() {
-      gameRunning = false;
-      setFeedback('GAME OVER', '#ff8c8c');
-      startOverlay.style.display = 'flex';
-      startOverlay.innerHTML = `
-        <h1 style="margin:0; font-size:28px;">ゲームオーバー</h1>
-        <div class="small">
-          Score: ${score}<br>
-          もう一度遊べます。
-        </div>
-        <button id="restartBtn">リトライ</button>
-      `;
-      document.getElementById('restartBtn').addEventListener('click', startGame, { once: true });
-    }
-
-    btnP.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      punch();
+// ── Particles ──
+function spawnParticles(x, y, color, count=10) {
+  for (let i=0;i<count;i++) {
+    const angle = Math.random()*Math.PI*2;
+    const speed = 60 + Math.random()*160;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle)*speed,
+      vy: Math.sin(angle)*speed,
+      r: 3+Math.random()*5,
+      color,
+      life: 0.5+Math.random()*0.4,
+      maxLife: 0.5+Math.random()*0.4,
     });
+  }
+}
+function spawnRing(x, y, color) {
+  particles.push({ type:'ring', x, y, r:10, maxR:55, life:0.35, maxLife:0.35, color });
+}
+function updateParticles(dt) {
+  fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  for (let i=particles.length-1;i>=0;i--) {
+    const p=particles[i];
+    p.life -= dt;
+    if (p.life<=0) { particles.splice(i,1); continue; }
+    const alpha = p.life/p.maxLife;
+    if (p.type==='ring') {
+      p.r += (p.maxR-10)*(dt/p.maxLife);
+      fxCtx.beginPath();
+      fxCtx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      fxCtx.strokeStyle = p.color;
+      fxCtx.globalAlpha = alpha*0.7;
+      fxCtx.lineWidth = 3;
+      fxCtx.stroke();
+      fxCtx.globalAlpha=1;
+    } else {
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+      p.vy += 300*dt; // gravity
+      fxCtx.beginPath();
+      fxCtx.arc(p.x,p.y,p.r*alpha,0,Math.PI*2);
+      fxCtx.fillStyle = p.color;
+      fxCtx.globalAlpha = alpha;
+      fxCtx.fill();
+      fxCtx.globalAlpha=1;
+    }
+  }
+}
 
-    btnK.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      kick();
-    });
+// ── Note creation ──
+function getProbs() {
+  // As wave increases, more special notes
+  const w = Math.min(wave, 8);
+  if (w<=2) return { p:.35, k:.35, bad:.1, bind:.08, heal:.07, rapid:.05, fast:0, fake:0 };
+  if (w<=4) return { p:.28, k:.28, bad:.1, bind:.07, heal:.06, rapid:.1, fast:.07, fake:.04 };
+  return      { p:.24, k:.24, bad:.1, bind:.06, heal:.05, rapid:.12, fast:.12, fake:.07 };
+}
+function createNote() {
+  const probs = getProbs();
+  const keys = Object.keys(probs);
+  let r = Math.random(), cum=0, type='p';
+  for (const k of keys) { cum+=probs[k]; if (r<cum) { type=k; break; } }
 
-    startBtn.addEventListener('click', startGame);
+  const labelMap  = { p:'P', k:'K', bad:'💀', bind:'⛓', heal:'♥', rapid:'⚡', fast:'💨', fake:'❓' };
+  const classMap  = { p:'', k:'k-note', bad:'bad-note', bind:'bind-note', heal:'heal-note',
+                      rapid:'rapid-note', fast:'fast-note', fake:'fake-note' };
 
-    window.addEventListener('keydown', (e) => {
-      const key = e.key.toLowerCase();
-      if (key === 'p') punch();
-      if (key === 'k') kick();
-    });
+  const note = document.createElement('div');
+  note.className = `note ${classMap[type]}`.trim();
+  note.dataset.label = labelMap[type];
+  gameArea.appendChild(note);
 
-    window.addEventListener('resize', () => {
-      notes.forEach(renderNote);
-    });
-  </script>
+  const startX = gameArea.clientWidth + 50;
+  const y      = gameArea.clientHeight * 0.85;
+
+  let hits=0, hitsNeeded=1;
+  if (type==='rapid') {
+    hitsNeeded = 3 + Math.floor(Math.random()*3); // 3~5
+    const badge = document.createElement('div');
+    badge.className='rapid-count';
+    badge.textContent = hitsNeeded;
+    note.appendChild(badge);
+  }
+
+  const speed = type==='fast' ? noteSpeed*1.65 : noteSpeed;
+  const noteObj = { el:note, x:startX, y, hit:false, type, speed, hits, hitsNeeded };
+  notes.push(noteObj);
+  renderNote(noteObj);
+}
+
+function renderNote(n) {
+  n.el.style.left = n.x+'px';
+  n.el.style.top  = n.y+'px';
+}
+
+// ── Sprite helpers ──
+function updateIdleSprite() {
+  if (isBound) { character.src='bin-a.png'; return; }
+  if (performance.now()<poisonUntil) { character.src=poisonFrames[poisonStep]; return; }
+  character.src=idleFrames[0];
+}
+function playPunchFrame() {
+  character.src=punchFrames[punchStep];
+  punchStep=(punchStep+1)%punchFrames.length;
+  isActing=true;
+  clearTimeout(playPunchFrame.t);
+  playPunchFrame.t=setTimeout(()=>{ isActing=false; updateIdleSprite(); }, 110);
+}
+function playKickFrame() {
+  character.src=kickFrames[kickStep];
+  kickStep=(kickStep+1)%kickFrames.length;
+  isActing=true;
+  clearTimeout(playKickFrame.t);
+  playKickFrame.t=setTimeout(()=>{ isActing=false; updateIdleSprite(); }, 110);
+}
+
+// ── Remove note ──
+function removeNote(n) {
+  if (n.el && n.el.parentNode) n.el.parentNode.removeChild(n.el);
+  notes = notes.filter(x=>x!==n);
+}
+
+// ── Note color for particles ──
+const noteColors = {
+  p:'#ff4e4e', k:'#4e9eff', bad:'#b04eff', bind:'#aaa',
+  heal:'#ff6e9e', rapid:'#ffcc00', fast:'#00ffcc', fake:'#ff8c42'
+};
+
+// ── Judge input ──
+function judgeInput(inputType) {
+  const judgeX = gameArea.clientWidth * judgeXRatio;
+  let best=null, bestDist=Infinity;
+  for (const n of notes) {
+    if (n.hit) continue;
+    const d=Math.abs(n.x-judgeX);
+    if (d<bestDist) { bestDist=d; best=n; }
+  }
+
+  if (!best || bestDist>72) {
+    combo=0; setFeedback('MISS','#9ecbff'); updateHud(); return;
+  }
+
+  const nx = best.x, ny = best.y;
+  const col = noteColors[best.type] || '#fff';
+
+  // ── Fake note ──
+  if (best.type==='fake') {
+    best.hit=true; removeNote(best);
+    life = Math.max(0, life-2);
+    combo=0;
+    setFeedback('FAKE!','#ff8c42');
+    screenShake();
+    spawnParticles(nx,ny,'#ff8c42',8);
+    updateHud(); if (life<=0) gameOver(); return;
+  }
+
+  // ── Special: bad/bind/heal ──
+  if (best.type==='bad') {
+    best.hit=true; removeNote(best);
+    life=Math.max(0,life-3); combo=0;
+    poisonUntil=performance.now()+5000; poisonStep=0; idleTimer=0;
+    character.src=poisonFrames[0];
+    setFeedback('POISON','#d38cff');
+    screenShake();
+    spawnParticles(nx,ny,'#b04eff',12);
+    spawnRing(nx,ny,'rgba(176,78,255,0.8)');
+    updateHud(); if (life<=0) gameOver(); return;
+  }
+  if (best.type==='bind') {
+    best.hit=true; removeNote(best);
+    combo=0; isBound=true; boundUntil=performance.now()+3000;
+    character.src='bin-a.png';
+    setFeedback('BIND','#d0d0d0');
+    spawnParticles(nx,ny,'#aaa',8);
+    updateHud(); return;
+  }
+  if (best.type==='heal') {
+    best.hit=true; removeNote(best);
+    life=Math.min(LIFE_MAX,life+3);
+    setFeedback('HEAL +3','#ff8fb1');
+    spawnParticles(nx,ny,'#ff6e9e',10);
+    spawnRing(nx,ny,'rgba(255,110,158,0.7)');
+    updateHud(); return;
+  }
+
+  // ── Rapid note ──
+  if (best.type==='rapid') {
+    best.hits++;
+    const badge = best.el.querySelector('.rapid-count');
+    const remaining = best.hitsNeeded - best.hits;
+    if (badge) badge.textContent = remaining > 0 ? remaining : '!';
+    spawnParticles(nx,ny,'#ffcc00',5);
+    judgeFlash();
+    if (best.hits>=best.hitsNeeded) {
+      best.hit=true; removeNote(best);
+      addScore(200*best.hitsNeeded); combo++;
+      setFeedback('RAPID!!','#ffcc00');
+      spawnParticles(nx,ny,'#ffcc00',16);
+      spawnRing(nx,ny,'rgba(255,204,0,0.8)');
+      showComboMult(combo);
+    } else {
+      addScore(80);
+      setFeedback('HIT!','#ffdd88');
+    }
+    updateHud(); return;
+  }
+
+  // ── Wrong key ──
+  const isNormal = best.type==='p'||best.type==='k'||best.type==='fast';
+  if (isNormal && best.type!==inputType && !(best.type==='fast' && (inputType==='p'||inputType==='k'))) {
+    // fast accepts both
+    if (best.type!=='fast') {
+      combo=0; setFeedback('WRONG','#ff9de1'); updateHud(); return;
+    }
+  }
+
+  // ── Normal / fast judgment ──
+  best.hit=true; removeNote(best);
+  judgeFlash();
+  spawnParticles(nx,ny,col,10);
+
+  if (bestDist<=20) {
+    addScore(300); combo++;
+    setFeedback('PERFECT','#ffe16a');
+    spawnRing(nx,ny,'rgba(255,225,106,0.9)');
+  } else if (bestDist<=44) {
+    addScore(150); combo++;
+    setFeedback('GOOD','#7dffb3');
+    spawnRing(nx,ny,'rgba(125,255,179,0.7)');
+  } else {
+    addScore(50); combo=0;
+    setFeedback('BAD','#ffb36b');
+  }
+  showComboMult(combo);
+  updateHud();
+}
+
+// ── Actions ──
+function punch() { if (!gameRunning||isBound) return; playPunchFrame(); judgeInput('p'); }
+function kick()  { if (!gameRunning||isBound) return; playKickFrame();  judgeInput('k'); }
+
+// ── Update idle ──
+function updateIdle(dt) {
+  idleTimer+=dt;
+  if (isBound) { character.src='bin-a.png'; return; }
+  if (performance.now()<poisonUntil) {
+    if (!isActing && idleTimer>=0.18) { idleTimer=0; playPoisonFrame(); }
+    return;
+  }
+  if (!isActing && idleTimer>=0.16) {
+    idleTimer=0; character.src=idleFrames[0];
+  }
+}
+function playPoisonFrame() {
+  character.src=poisonFrames[poisonStep];
+  poisonStep=(poisonStep+1)%poisonFrames.length;
+}
+
+// ── Update notes ──
+function updateNotes(dt) {
+  const judgeLeft = gameArea.clientWidth*judgeXRatio - 78;
+  const now = performance.now();
+  if (isBound && now>=boundUntil) { isBound=false; updateIdleSprite(); }
+
+  for (let i=notes.length-1;i>=0;i--) {
+    const n=notes[i];
+    n.x -= (n.speed||noteSpeed)*dt;
+    renderNote(n);
+    if (n.x < judgeLeft && !n.hit) {
+      combo=0;
+      const safe = n.type==='bad'||n.type==='bind'||n.type==='heal';
+      if (!safe) {
+        life--;
+        if (n.type!=='fake') setFeedback('MISS','#9ecbff');
+        updateHud();
+      }
+      removeNote(n);
+      if (life<=0) { gameOver(); return; }
+    }
+  }
+}
+
+// ── Wave system ──
+function updateWave(dt) {
+  waveTimer+=dt;
+  if (waveTimer>=waveDuration) {
+    waveTimer=0; wave++;
+    waveIndEl.textContent=`WAVE ${wave}`;
+    noteSpeed = 240 + (wave-1)*22;
+    spawnMin  = Math.max(0.55, 1.05-(wave-1)*0.07);
+    spawnRand = Math.max(0.2, 0.55-(wave-1)*0.04);
+    showWaveBanner(wave);
+  }
+}
+
+// ── Spawn ──
+function updateSpawn(dt) {
+  spawnTimer+=dt;
+  if (spawnTimer>=nextSpawn) {
+    spawnTimer=0;
+    createNote();
+    nextSpawn = spawnMin + Math.random()*spawnRand;
+  }
+}
+
+// ── Game loop ──
+function gameLoop(ts) {
+  if (!gameRunning) return;
+  if (!lastTime) lastTime=ts;
+  const dt = Math.min((ts-lastTime)/1000, 0.033);
+  lastTime=ts;
+  updateIdle(dt);
+  updateNotes(dt);
+  updateSpawn(dt);
+  updateWave(dt);
+  updateParticles(dt);
+  requestAnimationFrame(gameLoop);
+}
+
+// ── Reset ──
+function resetGame() {
+  notes.forEach(n=>n.el.remove());
+  notes=[]; particles=[];
+  score=0; combo=0; life=LIFE_MAX;
+  idleFrameIndex=0; idleTimer=0; spawnTimer=0;
+  nextSpawn=1.8; isActing=false;
+  punchStep=0; kickStep=0; poisonStep=0;
+  isBound=false; boundUntil=0; poisonUntil=0;
+  wave=1; waveTimer=0;
+  noteSpeed=240; spawnMin=1.05; spawnRand=0.55;
+  character.src=idleFrames[0];
+  waveIndEl.textContent='WAVE 1';
+  fxCtx.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  updateHud();
+  feedbackEl.style.opacity='0';
+  comboMultEl.style.opacity='0';
+}
+
+function startGame() {
+  resetGame();
+  gameRunning=true; lastTime=0;
+  startOverlay.style.display='none';
+  showWaveBanner(1);
+  requestAnimationFrame(gameLoop);
+}
+
+function gameOver() {
+  gameRunning=false;
+  saveRanking(score);
+  screenShake();
+  setFeedback('GAME OVER','#ff8c8c');
+  const r=getRankings();
+  const rank=r.indexOf(score)+1;
+  const rankStr=rank===1?'🏆 NEW RECORD!':rank===2?'🥈 2nd':rank===3?'🥉 3rd':`${rank}位`;
+  startOverlay.innerHTML=`
+    <h1>GAME OVER</h1>
+    <div class="small">WAVE ${wave} &nbsp;|&nbsp; Score: <b>${score.toLocaleString()}</b><br>${rankStr}</div>
+    <button class="overlay-btn" id="restartBtn">RETRY</button>
+    <div id="rankSection"></div>
+  `;
+  startOverlay.style.display='flex';
+  document.getElementById('restartBtn').addEventListener('click',startGame,{once:true});
+  // re-get rankSection
+  renderRankings(score);
+}
+
+// ── Input ──
+btnP.addEventListener('pointerdown',e=>{ e.preventDefault(); punch(); });
+btnK.addEventListener('pointerdown',e=>{ e.preventDefault(); kick(); });
+startBtn.addEventListener('click',()=>{ renderRankings(); startGame(); });
+window.addEventListener('keydown',e=>{
+  if (e.key.toLowerCase()==='p') punch();
+  if (e.key.toLowerCase()==='k') kick();
+});
+window.addEventListener('resize',()=>{ notes.forEach(renderNote); resizeCanvas(); });
+
+// ── Init: show rankings on start screen ──
+renderRankings();
+</script>
 </body>
 </html>
